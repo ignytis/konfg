@@ -1,0 +1,4 @@
+derived_value: "{{ base_value }} world"
+some_dict:
+    nested_key: "overwritten"
+    new_key: "{{ my.param }}"
