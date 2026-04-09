@@ -1,12 +1,12 @@
 mod cli;
 mod format_handlers;
+mod jinja;
 mod output;
 mod types;
 mod utils;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use minijinja::Environment;
 use serde_json::Value;
 
 use crate::{
@@ -21,15 +21,10 @@ use crate::{
     },
 };
 
-fn render_template(content: &str, ctx: &serde_json::Map<String, Value>) -> Result<String> {
-    let mut env = Environment::new();
-    env.add_template("t", content)?;
-    let tmpl = env.get_template("t")?;
-    Ok(tmpl.render(ctx)?)
-}
-
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let jinja = jinja::JinjaEngine::new();
+
     let params = hashmap_new_from_kv_params(&cli.params)?;
     let output = OutputTarget::parse(&cli.output)?;
 
@@ -38,7 +33,7 @@ fn main() -> Result<()> {
 
     for source in &cli.sources {
         let raw = read_raw(source)?;
-        let rendered = render_template(&raw, &jinja_ctx)
+        let rendered = jinja.render(&raw, &jinja_ctx)
             .with_context(|| format!("Jinja rendering failed for '{source}'"))?;
 
         let fmt = Format::try_detect_format(source)?;
