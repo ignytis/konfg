@@ -19,10 +19,8 @@ pub trait IoHandler {
 /// Factory method to get the appropriate IO handler for the given scheme.
 /// Iterates over all registered handlers and returns the first one that supports the kind.
 pub fn get_handler(scheme: &str) -> Result<Box<dyn IoHandler>> {
-    let handlers: Vec<Box<dyn IoHandler>> = vec![
-        Box::new(stdio::StdioHandler),
-        Box::new(file::FileHandler),
-    ];
+    let handlers: Vec<Box<dyn IoHandler>> =
+        vec![Box::new(stdio::StdioHandler), Box::new(file::FileHandler)];
 
     for handler in handlers {
         if handler.supports(scheme) {
@@ -30,8 +28,5 @@ pub fn get_handler(scheme: &str) -> Result<Box<dyn IoHandler>> {
         }
     }
 
-    Err(anyhow!(
-        "No IO handler found for: {}",
-        scheme
-    ))
+    Err(anyhow!("No IO handler found for: {}", scheme))
 }

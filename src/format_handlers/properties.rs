@@ -21,7 +21,6 @@ impl FormatHandler for PropertiesHandler {
         Ok(String::from_utf8(buf)?)
     }
 
-
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-properties")
     }
@@ -38,7 +37,11 @@ pub fn flatten(
     match value {
         Value::Object(obj) => {
             for (k, v) in obj {
-                let key = if uppercase { k.to_uppercase() } else { k.clone() };
+                let key = if uppercase {
+                    k.to_uppercase()
+                } else {
+                    k.clone()
+                };
                 let new_prefix = if prefix.is_empty() {
                     key
                 } else {

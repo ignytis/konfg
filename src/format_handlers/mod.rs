@@ -7,7 +7,6 @@ mod yaml;
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 
-
 /// A trait for defining how to parse and serialize configuration formats.
 pub trait FormatHandler {
     fn parse(&self, content: &str) -> Result<Value>;
@@ -34,8 +33,5 @@ pub fn get_handler(scheme: &str) -> Result<Box<dyn FormatHandler>> {
         }
     }
 
-    Err(anyhow!(
-        "No IO handler found for: {}",
-        scheme
-    ))
+    Err(anyhow!("No IO handler found for: {}", scheme))
 }

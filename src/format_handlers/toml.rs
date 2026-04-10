@@ -17,7 +17,6 @@ impl FormatHandler for TomlHandler {
         Ok(toml::to_string_pretty(&tv)?)
     }
 
-
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-toml")
     }

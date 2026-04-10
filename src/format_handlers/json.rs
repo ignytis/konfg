@@ -15,7 +15,6 @@ impl FormatHandler for JsonHandler {
         Ok(serde_json::to_string_pretty(value)?)
     }
 
-
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-json")
     }

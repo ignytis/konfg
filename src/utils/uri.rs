@@ -32,10 +32,10 @@ impl Uri {
         let input3 = input2.clone();
         match Self::try_or_none_from_string(input2) {
             Some(uri) => uri,
-            None =>  Uri {
+            None => Uri {
                 scheme: if is_input { "file-yaml" } else { "stdio-yaml" }.to_string(),
                 path: input3,
-            }
+            },
         }
     }
 }

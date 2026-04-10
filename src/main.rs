@@ -1,6 +1,6 @@
 mod cli;
 mod format_handlers;
-mod io;
+mod io_handlers;
 mod jinja;
 mod types;
 mod utils;
@@ -12,10 +12,7 @@ use serde_json::Value;
 use crate::{
     cli::Cli,
     types::endpoint::Endpoint,
-    utils::{
-        cfg_values::cfg_values_deep_merge,
-        hashmap::hashmap_new_from_kv_params,
-    },
+    utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
 };
 
 fn main() -> Result<()> {
@@ -30,11 +27,15 @@ fn main() -> Result<()> {
 
     for source_uri in &cli.sources {
         let source = Endpoint::parse(source_uri, true)?;
-        let raw = source.read()
+        let raw = source
+            .read()
             .with_context(|| format!("Failed to read '{source_uri}'"))?;
-        let rendered = jinja.render(&raw, &jinja_ctx)
+        let rendered = jinja
+            .render(&raw, &jinja_ctx)
             .with_context(|| format!("Jinja rendering failed for '{source_uri}'"))?;
-        let value = source.format().parse(&rendered)
+        let value = source
+            .format()
+            .parse(&rendered)
             .with_context(|| format!("Failed to parse '{source_uri}'"))?;
 
         cfg_values_deep_merge(&mut merged, value.clone())?;

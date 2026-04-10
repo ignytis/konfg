@@ -42,7 +42,11 @@ pub fn hashmap_new_from_kv_params(params: &[String]) -> Result<serde_json::Map<S
 
 /// Inserts a `value` into `map` using `key`.
 /// Considers the nested structure, spltting key by dots.
-fn hashmap_insert_value_dot_separator(map: &mut serde_json::Map<String, Value>, key: &str, val: Value) {
+fn hashmap_insert_value_dot_separator(
+    map: &mut serde_json::Map<String, Value>,
+    key: &str,
+    val: Value,
+) {
     if let Some((head, tail)) = key.split_once('.') {
         let entry = map
             .entry(head.to_string())
