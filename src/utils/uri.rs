@@ -22,21 +22,6 @@ impl Uri {
             None
         }
     }
-
-    /// Tries to parse the string as URL.
-    /// The `is_input` flag indicates if given string is input or output.
-    /// For input default is file, for output default is stdout
-    pub fn try_or_default_from_string<S: Into<String>>(input: S, is_input: bool) -> Uri {
-        let input2 = input.into();
-        let input3 = input2.clone();
-        match Self::try_or_none_from_string(input2) {
-            Some(uri) => uri,
-            None =>  Uri {
-                scheme: if is_input { "file" } else { "stdout" }.to_string(),
-                path: input3,
-            }
-        }
-    }
 }
 
 #[cfg(test)]

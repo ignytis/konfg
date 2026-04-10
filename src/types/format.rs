@@ -1,7 +1,5 @@
 use anyhow::Result;
 
-use crate::utils::uri::Uri;
-
 /// Supported configuration formats.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Format {
@@ -41,17 +39,6 @@ impl Format {
         } else {
             None
         }
-    }
-
-    /// Detects the configuration format of a source based on its URI scheme or path.
-    pub fn try_detect_format(uri: &str) -> Result<Format> {
-        if let Some(uri) = Uri::try_or_none_from_string(uri) {
-            if let Some(fmt) = Format::from_scheme(uri.scheme) {
-                return Ok(fmt);
-            }
-            return Format::try_detect_format_from_path(uri.path);
-        }
-        Format::try_detect_format_from_path(uri)
     }
 
     /// Detects the configuration format from a file path's extension.

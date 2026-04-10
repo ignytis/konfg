@@ -30,6 +30,27 @@ The project is structured into modular components:
 - Format the code using `rustfmt`
 - Document the structures, functions, enums, constants and other types
 
+### Use statements
+
+- Group the `use` statements using prefix and curly braces
+- Group the `use` statements in the following order:
+  - Standard library
+  - Third-party
+  - Local crate
+- Separate groups with empty lines
+- Order the `use` statements alphabetically
+- Add `crate::` for local crates
+
+Example:
+```rust
+use crate::{
+    format_handlers::{self, FormatHandler},
+    io::{self, IoHandler},
+    types::format::Format,
+    utils::uri::Uri
+};
+```
+
 ## Building and Running
 
 ### Prerequisites
