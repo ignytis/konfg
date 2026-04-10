@@ -7,7 +7,7 @@
 - **Multi-format Support**: Seamlessly merge and convert between YAML, JSON, TOML and dotenv.
 - **Deep Merging**: Intelligently merges nested objects. Later files overwrite values of earlier files.
 - **Jinja2 Templating**: Use `minijinja` to power your configurations. Access CLI parameters and previously merged values directly within your templates.
-- **Flexible I/O**: Support for URL-like schemes for specifying input/output formats and destinations (e.g., `stdin-yaml://`, `file-json://`, `stdout-toml://`, `file-dotenv://`).
+- **Flexible I/O**: Support for URL-like schemes for specifying input/output formats and destinations (e.g., `stdio-yaml://`, `file-json://`, `stdio-toml://`, `file-dotenv://`).
 - **Format Auto-detection**: Automatically detects formats based on file extensions or explicit URL schemes.
 
 ## Installation
@@ -29,7 +29,7 @@ konfg <templates...> [options]
 
 ### Options
 - `-p`, `--param <KEY=VALUE>`: Specify parameters available in Jinja context. Can be used multiple times. Supports dotted notation (e.g., `my.param=value`).
-- `-o`, `--output <TARGET>`: Path or URL to the output file. (Default: `stdout-yaml://`).
+- `-o`, `--output <TARGET>`: Path or URL to the output file. (Default: `stdio-yaml://`).
 
 ### Input & Output URL Schemes
 
@@ -37,8 +37,8 @@ konfg <templates...> [options]
 
 - `file:///path/to/file.json`: Detects format by extension.
 - `file-yaml:///path/to/file.conf`: Forces YAML format regardless of extension.
-- `stdin-toml://`: Reads standard input as TOML.
-- `stdout-json://`: Writes the merged result to standard output as JSON.
+- `stdio-toml://`: Reads standard input as TOML.
+- `stdio-json://`: Writes the merged result to standard output as JSON.
 
 ## Merging Logic
 

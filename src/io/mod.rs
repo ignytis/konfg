@@ -11,27 +11,27 @@ pub trait IoHandler {
     /// Writes serialized content to the destination.
     fn write(&self, dest: &str, content: &str) -> Result<()>;
 
-    /// Checks if this handler supports the given I/O kind (scheme or path).
-    /// For example: "stdin", "stdout", "file", or a file path.
-    fn supports(&self, io_kind: &str) -> bool;
+    /// Checks if this handler supports the given scheme
+    /// For example: "stdio-yaml", "file-toml"
+    fn supports(&self, scheme: &str) -> bool;
 }
 
-/// Factory method to get the appropriate IO handler for the given I/O kind.
+/// Factory method to get the appropriate IO handler for the given scheme.
 /// Iterates over all registered handlers and returns the first one that supports the kind.
-pub fn get_handler(io_kind: &str) -> Result<Box<dyn IoHandler>> {
+pub fn get_handler(scheme: &str) -> Result<Box<dyn IoHandler>> {
     let handlers: Vec<Box<dyn IoHandler>> = vec![
         Box::new(stdio::StdioHandler),
         Box::new(file::FileHandler),
     ];
 
     for handler in handlers {
-        if handler.supports(io_kind) {
+        if handler.supports(scheme) {
             return Ok(handler);
         }
     }
 
     Err(anyhow!(
         "No IO handler found for: {}",
-        io_kind
+        scheme
     ))
 }

@@ -16,8 +16,7 @@ impl IoHandler for FileHandler {
         Ok(())
     }
 
-    fn supports(&self, io_kind: &str) -> bool {
-        // Supports "file" scheme or any path that doesn't start with stdin/stdout
-        io_kind.starts_with("file") || (!io_kind.starts_with("stdin") && !io_kind.starts_with("stdout"))
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.starts_with("file-")
     }
 }

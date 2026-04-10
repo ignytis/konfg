@@ -18,7 +18,7 @@ impl IoHandler for StdioHandler {
         Ok(())
     }
 
-    fn supports(&self, io_kind: &str) -> bool {
-        io_kind.starts_with("stdin") || io_kind.starts_with("stdout")
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.starts_with("stdio-")
     }
 }

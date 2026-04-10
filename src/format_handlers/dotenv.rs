@@ -27,4 +27,8 @@ impl FormatHandler for DotenvHandler {
         }
         Ok(res)
     }
+
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.ends_with("-dotenv")
+    }
 }

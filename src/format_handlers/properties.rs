@@ -20,6 +20,11 @@ impl FormatHandler for PropertiesHandler {
         java_properties::write(&mut buf, &map)?;
         Ok(String::from_utf8(buf)?)
     }
+
+
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.ends_with("-properties")
+    }
 }
 
 /// Flattens a nested `Value` into a flat `HashMap<String, String>` using the provided delimiter.

@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     for source_uri in &cli.sources {
         let source = Endpoint::parse(source_uri, true)?;
-        let raw = source.read_raw()
+        let raw = source.read()
             .with_context(|| format!("Failed to read '{source_uri}'"))?;
         let rendered = jinja.render(&raw, &jinja_ctx)
             .with_context(|| format!("Jinja rendering failed for '{source_uri}'"))?;

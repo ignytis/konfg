@@ -9,7 +9,7 @@
 - **Multi-format Support:** Merge YAML, JSON, TOML, Properties (`.properties`), and Dotenv (`.env`) files.
 - **Jinja2 Templating:** Power your configurations with `minijinja`. Access CLI parameters and previously merged configuration values within templates.
 - **Deep Merging:** Intelligently merges nested objects. Arrays are replaced wholesale (later values win).
-- **Flexible Input/Output:** Supports URL-like schemes for specifying input and output formats and destinations (e.g., `stdin-yaml://`, `file-json://path/to/file.conf`, `stdout-toml://`).
+- **Flexible Input/Output:** Supports URL-like schemes for specifying input and output formats and destinations (e.g., `stdio-yaml://`, `file-json://path/to/file.conf`, `stdio-toml://`).
 - **Format Auto-detection:** Automatically detects formats based on file extensions or explicitly provided schemes.
 
 ## Architecture
@@ -29,6 +29,8 @@ The project is structured into modular components:
 
 - Format the code using `rustfmt`
 - Document the structures, functions, enums, constants and other types
+- Avoid multiple assertions on a single instructions, like `if ... = let ... = fn()`
+- Return fast
 
 ### Use statements
 
@@ -66,7 +68,7 @@ use crate::{
 ### Example Usage
 
 ```bash
-cargo run -- template1.yaml template2.toml -p my.param=value -o stdout-json://
+cargo run -- template1.yaml template2.toml -p my.param=value -o stdio-json://
 ```
 
 ## Development Conventions

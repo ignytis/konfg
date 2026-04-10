@@ -16,4 +16,9 @@ impl FormatHandler for TomlHandler {
         let tv: toml::Value = serde_json::from_value(value.clone())?;
         Ok(toml::to_string_pretty(&tv)?)
     }
+
+
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.ends_with("-toml")
+    }
 }

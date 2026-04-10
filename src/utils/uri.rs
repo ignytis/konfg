@@ -1,5 +1,6 @@
 const SCHEME_SEPARATOR: &str = "://";
 
+#[derive(Debug, Clone)]
 /// A URI structure representing a scheme and a path.
 pub struct Uri {
     pub scheme: String,
@@ -22,6 +23,21 @@ impl Uri {
             None
         }
     }
+
+    /// Tries to parse the string as URL.
+    /// The `is_input` flag indicates if given string is input or output.
+    /// For input default is file, for output default is stdio
+    pub fn try_or_default_from_string<S: Into<String>>(input: S, is_input: bool) -> Uri {
+        let input2 = input.into();
+        let input3 = input2.clone();
+        match Self::try_or_none_from_string(input2) {
+            Some(uri) => uri,
+            None =>  Uri {
+                scheme: if is_input { "file-yaml" } else { "stdio-yaml" }.to_string(),
+                path: input3,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -34,8 +50,8 @@ mod tests {
         assert_eq!(uri.scheme, "file");
         assert_eq!(uri.path, "path/to/file");
 
-        let uri = Uri::try_or_none_from_string("stdin-yaml://").unwrap();
-        assert_eq!(uri.scheme, "stdin-yaml");
+        let uri = Uri::try_or_none_from_string("stdio-yaml://").unwrap();
+        assert_eq!(uri.scheme, "stdio-yaml");
         assert_eq!(uri.path, "");
     }
 

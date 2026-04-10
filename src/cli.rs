@@ -10,6 +10,6 @@ pub struct Cli {
     #[arg(short = 'p', long = "param")]
     pub params: Vec<String>,
 
-    #[arg(short = 'o', long = "output", default_value = "stdout-yaml://")]
+    #[arg(short = 'o', long = "output", default_value = "stdio-yaml://")]
     pub output: String,
 }

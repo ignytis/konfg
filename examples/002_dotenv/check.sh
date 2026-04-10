@@ -2,6 +2,7 @@
 
 set -e
 
+echo "====== TEST START ====="
 echo "Expected Dotenv: "
 cat examples/002_dotenv/out.env
 
@@ -12,6 +13,8 @@ echo ""
 
 echo "Actual Dotenv: "
 ./target/debug/konfg \
-    examples/002_dotenv/in.env \
+    file-dotenv://examples/002_dotenv/in.env \
     --param dbname=mydb \
-    -o stdout-dotenv://
+    -o stdio-dotenv://
+
+echo "====== TEST END ====="

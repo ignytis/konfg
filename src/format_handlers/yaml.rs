@@ -14,4 +14,8 @@ impl FormatHandler for YamlHandler {
     fn serialize(&self, value: &Value) -> Result<String> {
         Ok(serde_yaml::to_string(value)?)
     }
+
+    fn supports(&self, scheme: &str) -> bool {
+        scheme.ends_with("-yaml")
+    }
 }
