@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::format_handlers::FormatHandler;
 
 /// A handler for managing JSON configuration files.
+#[derive(Clone)]
 pub struct JsonHandler;
 
 impl FormatHandler for JsonHandler {
@@ -17,6 +18,10 @@ impl FormatHandler for JsonHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-json")
+    }
+
+    fn clone_box(&self) -> Box<dyn FormatHandler> {
+        Box::new(self.clone())
     }
 }
 

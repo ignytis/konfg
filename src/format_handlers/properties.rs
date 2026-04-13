@@ -5,6 +5,7 @@ use crate::format_handlers::FormatHandler;
 use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
 /// A handler for managing Java properties configuration files.
+#[derive(Clone)]
 pub struct PropertiesHandler;
 
 impl FormatHandler for PropertiesHandler {
@@ -22,6 +23,10 @@ impl FormatHandler for PropertiesHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-properties")
+    }
+
+    fn clone_box(&self) -> Box<dyn FormatHandler> {
+        Box::new(self.clone())
     }
 }
 

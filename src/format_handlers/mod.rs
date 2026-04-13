@@ -4,36 +4,46 @@ mod properties;
 mod toml;
 mod yaml;
 
+use std::sync::LazyLock;
+
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 
+const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new(|| vec![
+    Box::new(dotenv::DotenvHandler),
+    Box::new(json::JsonHandler),
+    Box::new(properties::PropertiesHandler),
+    Box::new(toml::TomlHandler),
+    Box::new(yaml::YamlHandler),
+]);
+
 /// A trait for defining how to parse and serialize configuration formats.
-pub trait FormatHandler {
+pub trait FormatHandler: Send + Sync {
     fn parse(&self, content: &str) -> Result<Value>;
     fn serialize(&self, value: &Value) -> Result<String>;
     /// Checks if this handler supports the given scheme
     /// For example: "stdio-yaml", "file-toml"
     fn supports(&self, scheme: &str) -> bool;
+    /// Clones the handler into a boxed trait object.
+    fn clone_box(&self) -> Box<dyn FormatHandler>;
 }
 
-/// Factory method to get the appropriate firnat handler for the given scheme
+impl Clone for Box<dyn FormatHandler> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+/// Factory method to get the appropriate format handler for the given scheme
 /// Iterates over all registered handlers and returns the first one that supports the kind.
 pub fn get_handler(scheme: &str) -> Result<Box<dyn FormatHandler>> {
-    let handlers: Vec<Box<dyn FormatHandler>> = vec![
-        Box::new(dotenv::DotenvHandler),
-        Box::new(json::JsonHandler),
-        Box::new(properties::PropertiesHandler),
-        Box::new(toml::TomlHandler),
-        Box::new(yaml::YamlHandler),
-    ];
-
-    for handler in handlers {
+    for handler in REGISTERED_HANDLERS.iter() {
         if handler.supports(scheme) {
-            return Ok(handler);
+            return Ok(handler.clone());
         }
     }
 
-    Err(anyhow!("No IO handler found for: {}", scheme))
+    Err(anyhow!("No format handler found for: {}", scheme))
 }
 
 #[cfg(test)]

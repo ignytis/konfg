@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::format_handlers::FormatHandler;
 
 /// A handler for managing TOML configuration files.
+#[derive(Clone)]
 pub struct TomlHandler;
 
 impl FormatHandler for TomlHandler {
@@ -19,6 +20,10 @@ impl FormatHandler for TomlHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-toml")
+    }
+
+    fn clone_box(&self) -> Box<dyn FormatHandler> {
+        Box::new(self.clone())
     }
 }
 

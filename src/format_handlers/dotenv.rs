@@ -7,6 +7,7 @@ use crate::{
 };
 
 /// A handler for managing `.env` configuration files.
+#[derive(Clone)]
 pub struct DotenvHandler;
 
 impl FormatHandler for DotenvHandler {
@@ -31,6 +32,10 @@ impl FormatHandler for DotenvHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-dotenv")
+    }
+
+    fn clone_box(&self) -> Box<dyn FormatHandler> {
+        Box::new(self.clone())
     }
 }
 

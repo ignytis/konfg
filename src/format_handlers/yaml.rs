@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::format_handlers::FormatHandler;
 
 /// A handler for managing YAML configuration files.
+#[derive(Clone)]
 pub struct YamlHandler;
 
 impl FormatHandler for YamlHandler {
@@ -17,6 +18,10 @@ impl FormatHandler for YamlHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.ends_with("-yaml")
+    }
+
+    fn clone_box(&self) -> Box<dyn FormatHandler> {
+        Box::new(self.clone())
     }
 }
 
