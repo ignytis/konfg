@@ -53,6 +53,13 @@ use crate::{
 };
 ```
 
+## Post-edit acctions
+
+At the end of plan execution:
+1. Format the code using `rustfmt`
+2. Run unit tests using `cargo test`
+3. Compile the application using `cargo build`
+
 ## Building and Running
 
 ### Prerequisites

@@ -35,7 +35,7 @@ pub fn hashmap_new_from_kv_params(params: &[String]) -> Result<serde_json::Map<S
         let (key, val) = p
             .split_once('=')
             .ok_or_else(|| anyhow::anyhow!("Invalid param '{p}': expected key=value"))?;
-        hashmap_insert_value_dot_separator(&mut map, key, Value::String(val.to_string()));
+        map = hashmap_insert_value_dot_separator(map, key, Value::String(val.to_string()));
     }
     Ok(map)
 }
@@ -43,30 +43,33 @@ pub fn hashmap_new_from_kv_params(params: &[String]) -> Result<serde_json::Map<S
 /// Inserts a `value` into `map` using `key`.
 /// Considers the nested structure, spltting key by dots.
 fn hashmap_insert_value_dot_separator(
-    map: &mut serde_json::Map<String, Value>,
+    mut map: serde_json::Map<String, Value>,
     key: &str,
     val: Value,
-) {
+) -> serde_json::Map<String, Value> {
     if let Some((head, tail)) = key.split_once('.') {
-        let entry = map
-            .entry(head.to_string())
-            .or_insert_with(|| Value::Object(Default::default()));
-        if let Value::Object(inner) = entry {
-            hashmap_insert_value_dot_separator(inner, tail, val);
-        }
+        let inner = match map.remove(head) {
+            Some(Value::Object(inner_map)) => inner_map,
+            _ => serde_json::Map::new(),
+        };
+        map.insert(
+            head.to_string(),
+            Value::Object(hashmap_insert_value_dot_separator(inner, tail, val)),
+        );
     } else {
         map.insert(key.to_string(), val);
     }
+    map
 }
 
 /// Flattens a nested `Value` into a flat `HashMap<String, String>` using the provided delimiter.
 pub fn hashmap_flatten(
     value: &Value,
-    prefix: String,
-    map: &mut std::collections::HashMap<String, String>,
+    prefix: &str,
     delimiter: &str,
     uppercase: bool,
-) {
+) -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
     match value {
         Value::Object(obj) => {
             for (k, v) in obj {
@@ -80,7 +83,7 @@ pub fn hashmap_flatten(
                 } else {
                     format!("{}{}{}", prefix, delimiter, key)
                 };
-                hashmap_flatten(v, new_prefix, map, delimiter, uppercase);
+                map.extend(hashmap_flatten(v, &new_prefix, delimiter, uppercase));
             }
         }
         Value::Array(arr) => {
@@ -90,22 +93,23 @@ pub fn hashmap_flatten(
                 } else {
                     format!("{}{}{}", prefix, delimiter, i)
                 };
-                hashmap_flatten(v, new_prefix, map, delimiter, uppercase);
+                map.extend(hashmap_flatten(v, &new_prefix, delimiter, uppercase));
             }
         }
         Value::String(s) => {
-            map.insert(prefix, s.clone());
+            map.insert(prefix.to_string(), s.clone());
         }
         Value::Bool(b) => {
-            map.insert(prefix, b.to_string());
+            map.insert(prefix.to_string(), b.to_string());
         }
         Value::Number(n) => {
-            map.insert(prefix, n.to_string());
+            map.insert(prefix.to_string(), n.to_string());
         }
         Value::Null => {
-            map.insert(prefix, String::new());
+            map.insert(prefix.to_string(), String::new());
         }
     }
+    map
 }
 
 #[cfg(test)]

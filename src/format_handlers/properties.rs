@@ -14,8 +14,7 @@ impl FormatHandler for PropertiesHandler {
     }
 
     fn serialize(&self, value: &Value) -> Result<String> {
-        let mut map = std::collections::HashMap::new();
-        hashmap_flatten(value, String::new(), &mut map, ".", false);
+        let map = hashmap_flatten(value, "", ".", false);
         let mut buf = Vec::new();
         java_properties::write(&mut buf, &map)?;
         Ok(String::from_utf8(buf)?)

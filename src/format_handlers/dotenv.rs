@@ -21,8 +21,7 @@ impl FormatHandler for DotenvHandler {
     }
 
     fn serialize(&self, value: &Value) -> Result<String> {
-        let mut map = std::collections::HashMap::new();
-        hashmap_flatten(value, String::new(), &mut map, "__", true);
+        let map = hashmap_flatten(value, "", "__", true);
         let mut res = String::new();
         for (k, v) in map {
             res.push_str(&format!("{}={}\n", k, v));
