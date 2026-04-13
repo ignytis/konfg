@@ -4,6 +4,7 @@ use std::fs;
 use super::IoHandler;
 
 /// Handles file input/output operations.
+#[derive(Clone)]
 pub struct FileHandler;
 
 impl IoHandler for FileHandler {
@@ -18,5 +19,9 @@ impl IoHandler for FileHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.starts_with("file-")
+    }
+
+    fn clone_box(&self) -> Box<dyn IoHandler> {
+        Box::new(self.clone())
     }
 }

@@ -9,13 +9,15 @@ use std::sync::LazyLock;
 use anyhow::{anyhow, Result};
 use serde_json::Value;
 
-const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new(|| vec![
-    Box::new(dotenv::DotenvHandler),
-    Box::new(json::JsonHandler),
-    Box::new(properties::PropertiesHandler),
-    Box::new(toml::TomlHandler),
-    Box::new(yaml::YamlHandler),
-]);
+const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new(|| {
+    vec![
+        Box::new(dotenv::DotenvHandler),
+        Box::new(json::JsonHandler),
+        Box::new(properties::PropertiesHandler),
+        Box::new(toml::TomlHandler),
+        Box::new(yaml::YamlHandler),
+    ]
+});
 
 /// A trait for defining how to parse and serialize configuration formats.
 pub trait FormatHandler: Send + Sync {

@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use super::IoHandler;
 
 /// Handles standard input/output operations.
+#[derive(Clone)]
 pub struct StdioHandler;
 
 impl IoHandler for StdioHandler {
@@ -20,5 +21,9 @@ impl IoHandler for StdioHandler {
 
     fn supports(&self, scheme: &str) -> bool {
         scheme.starts_with("stdio-")
+    }
+
+    fn clone_box(&self) -> Box<dyn IoHandler> {
+        Box::new(self.clone())
     }
 }
