@@ -35,3 +35,44 @@ pub fn get_handler(scheme: &str) -> Result<Box<dyn FormatHandler>> {
 
     Err(anyhow!("No IO handler found for: {}", scheme))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_handler_json() {
+        let handler = get_handler("file-json").unwrap();
+        assert!(handler.supports("file-json"));
+    }
+
+    #[test]
+    fn test_get_handler_yaml() {
+        let handler = get_handler("stdio-yaml").unwrap();
+        assert!(handler.supports("stdio-yaml"));
+    }
+
+    #[test]
+    fn test_get_handler_toml() {
+        let handler = get_handler("file-toml").unwrap();
+        assert!(handler.supports("file-toml"));
+    }
+
+    #[test]
+    fn test_get_handler_properties() {
+        let handler = get_handler("stdio-properties").unwrap();
+        assert!(handler.supports("stdio-properties"));
+    }
+
+    #[test]
+    fn test_get_handler_dotenv() {
+        let handler = get_handler("file-dotenv").unwrap();
+        assert!(handler.supports("file-dotenv"));
+    }
+
+    #[test]
+    fn test_get_handler_unknown() {
+        let result = get_handler("file-unknown");
+        assert!(result.is_err());
+    }
+}

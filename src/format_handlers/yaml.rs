@@ -19,3 +19,33 @@ impl FormatHandler for YamlHandler {
         scheme.ends_with("-yaml")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_yaml_parse() {
+        let handler = YamlHandler;
+        let content = "key: value\nnested:\n  a: 1";
+        let parsed = handler.parse(content).unwrap();
+        assert_eq!(parsed, json!({"key": "value", "nested": {"a": 1}}));
+    }
+
+    #[test]
+    fn test_yaml_serialize() {
+        let handler = YamlHandler;
+        let value = json!({"key": "value"});
+        let serialized = handler.serialize(&value).unwrap();
+        assert!(serialized.contains("key: value"));
+    }
+
+    #[test]
+    fn test_yaml_supports() {
+        let handler = YamlHandler;
+        assert!(handler.supports("file-yaml"));
+        assert!(handler.supports("stdio-yaml"));
+        assert!(!handler.supports("file-json"));
+    }
+}

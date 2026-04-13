@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::format_handlers::FormatHandler;
-use crate::utils::hashmap::hashmap_new_from_flat_hashmap;
+use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
 /// A handler for managing Java properties configuration files.
 pub struct PropertiesHandler;
@@ -15,7 +15,7 @@ impl FormatHandler for PropertiesHandler {
 
     fn serialize(&self, value: &Value) -> Result<String> {
         let mut map = std::collections::HashMap::new();
-        flatten(value, String::new(), &mut map, ".", false);
+        hashmap_flatten(value, String::new(), &mut map, ".", false);
         let mut buf = Vec::new();
         java_properties::write(&mut buf, &map)?;
         Ok(String::from_utf8(buf)?)
@@ -26,51 +26,49 @@ impl FormatHandler for PropertiesHandler {
     }
 }
 
-/// Flattens a nested `Value` into a flat `HashMap<String, String>` using the provided delimiter.
-pub fn flatten(
-    value: &Value,
-    prefix: String,
-    map: &mut std::collections::HashMap<String, String>,
-    delimiter: &str,
-    uppercase: bool,
-) {
-    match value {
-        Value::Object(obj) => {
-            for (k, v) in obj {
-                let key = if uppercase {
-                    k.to_uppercase()
-                } else {
-                    k.clone()
-                };
-                let new_prefix = if prefix.is_empty() {
-                    key
-                } else {
-                    format!("{}{}{}", prefix, delimiter, key)
-                };
-                flatten(v, new_prefix, map, delimiter, uppercase);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_properties_parse() {
+        let handler = PropertiesHandler;
+        let content = "a.b.c=val1\na.b.d=val2\nx.y=val3";
+        let parsed = handler.parse(content).unwrap();
+        assert_eq!(
+            parsed,
+            json!({
+                "a": {
+                    "b": {
+                        "c": "val1",
+                        "d": "val2"
+                    }
+                },
+                "x": {
+                    "y": "val3"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_properties_serialize() {
+        let handler = PropertiesHandler;
+        let value = json!({
+            "a": {
+                "b": "c"
             }
-        }
-        Value::Array(arr) => {
-            for (i, v) in arr.iter().enumerate() {
-                let new_prefix = if prefix.is_empty() {
-                    i.to_string()
-                } else {
-                    format!("{}{}{}", prefix, delimiter, i)
-                };
-                flatten(v, new_prefix, map, delimiter, uppercase);
-            }
-        }
-        Value::String(s) => {
-            map.insert(prefix, s.clone());
-        }
-        Value::Bool(b) => {
-            map.insert(prefix, b.to_string());
-        }
-        Value::Number(n) => {
-            map.insert(prefix, n.to_string());
-        }
-        Value::Null => {
-            map.insert(prefix, String::new());
-        }
+        });
+        let serialized = handler.serialize(&value).unwrap();
+        assert!(serialized.contains("a.b=c"));
+    }
+
+    #[test]
+    fn test_properties_supports() {
+        let handler = PropertiesHandler;
+        assert!(handler.supports("file-properties"));
+        assert!(handler.supports("stdio-properties"));
+        assert!(!handler.supports("file-json"));
     }
 }

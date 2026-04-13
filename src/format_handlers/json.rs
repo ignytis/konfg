@@ -19,3 +19,33 @@ impl FormatHandler for JsonHandler {
         scheme.ends_with("-json")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_json_parse() {
+        let handler = JsonHandler;
+        let content = r#"{"key": "value", "nested": {"a": 1}}"#;
+        let parsed = handler.parse(content).unwrap();
+        assert_eq!(parsed, json!({"key": "value", "nested": {"a": 1}}));
+    }
+
+    #[test]
+    fn test_json_serialize() {
+        let handler = JsonHandler;
+        let value = json!({"key": "value"});
+        let serialized = handler.serialize(&value).unwrap();
+        assert!(serialized.contains(r#""key": "value""#));
+    }
+
+    #[test]
+    fn test_json_supports() {
+        let handler = JsonHandler;
+        assert!(handler.supports("file-json"));
+        assert!(handler.supports("stdio-json"));
+        assert!(!handler.supports("file-yaml"));
+    }
+}
