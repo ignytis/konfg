@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::format_handlers::FormatHandler;
+use crate::handlers::format::FormatHandler;
 
 /// A handler for managing YAML configuration files.
 #[derive(Clone)]
@@ -16,8 +16,8 @@ impl FormatHandler for YamlHandler {
         Ok(serde_yaml::to_string(value)?)
     }
 
-    fn supports(&self, scheme: &str) -> bool {
-        scheme.ends_with("-yaml")
+    fn supports(&self, format: &str) -> bool {
+        format == "yaml"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {
@@ -49,8 +49,7 @@ mod tests {
     #[test]
     fn test_yaml_supports() {
         let handler = YamlHandler;
-        assert!(handler.supports("file-yaml"));
-        assert!(handler.supports("stdio-yaml"));
-        assert!(!handler.supports("file-json"));
+        assert!(handler.supports("yaml"));
+        assert!(!handler.supports("json"));
     }
 }

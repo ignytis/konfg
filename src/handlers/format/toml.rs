@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::format_handlers::FormatHandler;
+use crate::handlers::format::FormatHandler;
 
 /// A handler for managing TOML configuration files.
 #[derive(Clone)]
@@ -18,8 +18,8 @@ impl FormatHandler for TomlHandler {
         Ok(toml::to_string_pretty(&tv)?)
     }
 
-    fn supports(&self, scheme: &str) -> bool {
-        scheme.ends_with("-toml")
+    fn supports(&self, format: &str) -> bool {
+        format == "toml"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {
@@ -53,8 +53,7 @@ a = 1"#;
     #[test]
     fn test_toml_supports() {
         let handler = TomlHandler;
-        assert!(handler.supports("file-toml"));
-        assert!(handler.supports("stdio-toml"));
-        assert!(!handler.supports("file-json"));
+        assert!(handler.supports("toml"));
+        assert!(!handler.supports("json"));
     }
 }

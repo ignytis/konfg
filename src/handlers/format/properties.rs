@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::format_handlers::FormatHandler;
+use crate::handlers::format::FormatHandler;
 use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
 /// A handler for managing Java properties configuration files.
@@ -21,8 +21,8 @@ impl FormatHandler for PropertiesHandler {
         Ok(String::from_utf8(buf)?)
     }
 
-    fn supports(&self, scheme: &str) -> bool {
-        scheme.ends_with("-properties")
+    fn supports(&self, format: &str) -> bool {
+        format == "properties"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {
@@ -71,8 +71,7 @@ mod tests {
     #[test]
     fn test_properties_supports() {
         let handler = PropertiesHandler;
-        assert!(handler.supports("file-properties"));
-        assert!(handler.supports("stdio-properties"));
-        assert!(!handler.supports("file-json"));
+        assert!(handler.supports("properties"));
+        assert!(!handler.supports("json"));
     }
 }

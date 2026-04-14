@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::{
-    format_handlers::FormatHandler,
+    handlers::format::FormatHandler,
     utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap},
 };
 
@@ -30,8 +30,8 @@ impl FormatHandler for DotenvHandler {
         Ok(res)
     }
 
-    fn supports(&self, scheme: &str) -> bool {
-        scheme.ends_with("-dotenv")
+    fn supports(&self, format: &str) -> bool {
+        format == "dotenv"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {
@@ -79,8 +79,7 @@ mod tests {
     #[test]
     fn test_dotenv_supports() {
         let handler = DotenvHandler;
-        assert!(handler.supports("file-dotenv"));
-        assert!(handler.supports("stdio-dotenv"));
-        assert!(!handler.supports("file-json"));
+        assert!(handler.supports("dotenv"));
+        assert!(!handler.supports("json"));
     }
 }

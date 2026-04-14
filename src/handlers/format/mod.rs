@@ -23,9 +23,8 @@ const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new
 pub trait FormatHandler: Send + Sync {
     fn parse(&self, content: &str) -> Result<Value>;
     fn serialize(&self, value: &Value) -> Result<String>;
-    /// Checks if this handler supports the given scheme
-    /// For example: "stdio-yaml", "file-toml"
-    fn supports(&self, scheme: &str) -> bool;
+    /// Checks if this handler supports the given format name, e.g. "yaml", "json", "toml".
+    fn supports(&self, format: &str) -> bool;
     /// Clones the handler into a boxed trait object.
     fn clone_box(&self) -> Box<dyn FormatHandler>;
 }
@@ -36,16 +35,16 @@ impl Clone for Box<dyn FormatHandler> {
     }
 }
 
-/// Factory method to get the appropriate format handler for the given scheme
-/// Iterates over all registered handlers and returns the first one that supports the kind.
-pub fn get_handler(scheme: &str) -> Result<Box<dyn FormatHandler>> {
+/// Factory method to get the appropriate format handler for the given format name.
+/// Iterates over all registered handlers and returns the first one that supports the format.
+pub fn get_handler(format: &str) -> Result<Box<dyn FormatHandler>> {
     for handler in REGISTERED_HANDLERS.iter() {
-        if handler.supports(scheme) {
+        if handler.supports(format) {
             return Ok(handler.clone());
         }
     }
 
-    Err(anyhow!("No format handler found for: {}", scheme))
+    Err(anyhow!("No format handler found for: {}", format))
 }
 
 #[cfg(test)]
@@ -54,37 +53,31 @@ mod tests {
 
     #[test]
     fn test_get_handler_json() {
-        let handler = get_handler("file-json").unwrap();
-        assert!(handler.supports("file-json"));
+        assert!(get_handler("json").is_ok());
     }
 
     #[test]
     fn test_get_handler_yaml() {
-        let handler = get_handler("stdio-yaml").unwrap();
-        assert!(handler.supports("stdio-yaml"));
+        assert!(get_handler("yaml").is_ok());
     }
 
     #[test]
     fn test_get_handler_toml() {
-        let handler = get_handler("file-toml").unwrap();
-        assert!(handler.supports("file-toml"));
+        assert!(get_handler("toml").is_ok());
     }
 
     #[test]
     fn test_get_handler_properties() {
-        let handler = get_handler("stdio-properties").unwrap();
-        assert!(handler.supports("stdio-properties"));
+        assert!(get_handler("properties").is_ok());
     }
 
     #[test]
     fn test_get_handler_dotenv() {
-        let handler = get_handler("file-dotenv").unwrap();
-        assert!(handler.supports("file-dotenv"));
+        assert!(get_handler("dotenv").is_ok());
     }
 
     #[test]
     fn test_get_handler_unknown() {
-        let result = get_handler("file-unknown");
-        assert!(result.is_err());
+        assert!(get_handler("unknown").is_err());
     }
 }

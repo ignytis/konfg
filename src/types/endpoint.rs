@@ -1,32 +1,30 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::{
-    format_handlers::{self, FormatHandler},
-    io_handlers::{self, IoHandler},
-    utils::uri::Uri,
+use crate::handlers::{
+    format::{self as format_handlers, FormatHandler},
+    io,
 };
 
 /// Represents a configuration source or destination with associated IO and format handlers.
 pub struct Endpoint {
-    io: Box<dyn IoHandler>,
+    io: Box<dyn io::IoHandler>,
     format: Box<dyn FormatHandler>,
     path: String,
 }
 
 impl Endpoint {
-    /// Parses a URI string into an `Endpoint`.
-    /// `is_input` controls the default scheme when no URI scheme is present.
-    pub fn parse(uri_str: &str, is_input: bool) -> Result<Self> {
-        let uri = Uri::try_or_default_from_string(uri_str, is_input);
+    /// Creates an `Endpoint` from an IO kind (e.g. `"file"`, `"stdio"`), a format name
+    /// (e.g. `"yaml"`, `"json"`), and an optional path.
+    pub fn new(kind: &str, format: &str, path: &str) -> Result<Self> {
         Ok(Self {
-            io: io_handlers::get_handler(&uri.scheme)?,
-            format: format_handlers::get_handler(&uri.scheme)?,
-            path: uri.path,
+            io: io::get_handler(kind)?,
+            format: format_handlers::get_handler(format)?,
+            path: path.to_string(),
         })
     }
 
-    /// Reads raw string content from this endpoint (for Jinja rendering before parsing).
+    /// Reads raw string content from this endpoint.
     pub fn read(&self) -> Result<String> {
         self.io.read(&self.path)
     }

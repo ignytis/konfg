@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::format_handlers::FormatHandler;
+use crate::handlers::format::FormatHandler;
 
 /// A handler for managing JSON configuration files.
 #[derive(Clone)]
@@ -16,8 +16,8 @@ impl FormatHandler for JsonHandler {
         Ok(serde_json::to_string_pretty(value)?)
     }
 
-    fn supports(&self, scheme: &str) -> bool {
-        scheme.ends_with("-json")
+    fn supports(&self, format: &str) -> bool {
+        format == "json"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {
@@ -49,8 +49,7 @@ mod tests {
     #[test]
     fn test_json_supports() {
         let handler = JsonHandler;
-        assert!(handler.supports("file-json"));
-        assert!(handler.supports("stdio-json"));
-        assert!(!handler.supports("file-yaml"));
+        assert!(handler.supports("json"));
+        assert!(!handler.supports("yaml"));
     }
 }
