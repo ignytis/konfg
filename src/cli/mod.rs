@@ -1,5 +1,9 @@
-use anyhow::{anyhow, Result};
-use clap::Parser;
+pub mod build;
+
+use anyhow::{Result, anyhow};
+use clap::{Parser, Subcommand};
+
+use crate::cli::build::BuildArgs;
 
 /// A parsed I/O specification: either `file <path> <format>` or `stdio <format>`.
 #[derive(Debug, Clone)]
@@ -29,37 +33,16 @@ pub fn parse_output_spec(tokens: &[String]) -> Result<IoSpec> {
 }
 
 /// CLI arguments.
-///
-/// Inputs are specified as repeated `-in` flags, each consuming 2 or 3 tokens:
-///   `-in stdio json`  or  `-in file /path/to/file.yaml yaml`
-///
-/// Output is specified once with `-out`:
-///   `-out yaml`  or  `-out stdio json`  or  `-out file /path/to/out.json json`
 #[derive(Parser)]
 #[command(name = "konfg", about = "Configuration builder")]
 pub struct Cli {
-    /// Input spec tokens. Repeat for multiple inputs.
-    /// Usage: `-in file /path fmt` or `-in stdio fmt`
-    #[arg(
-        short = 'i',
-        long = "in",
-        num_args = 1..=3,
-        action = clap::ArgAction::Append,
-        value_names = ["KIND", "PATH_OR_FORMAT", "FORMAT"]
-    )]
-    pub inputs: Vec<String>,
-
-    /// Output spec tokens.
-    /// Usage: `-out fmt` or `-out stdio fmt` or `-out file /path fmt`
-    #[arg(
-        short = 'o',
-        long = "out",
-        num_args = 1..=3,
-        value_names = ["KIND_OR_FORMAT", "PATH", "FORMAT"]
-    )]
-    pub output: Vec<String>,
-
-    /// Parameters available in Jinja context as `key=value`.
-    #[arg(short = 'p', long = "param")]
-    pub params: Vec<String>,
+    #[command(subcommand)]
+    pub command: Commands,
 }
+
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Build configuration
+    Build(BuildArgs),
+}
+

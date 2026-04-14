@@ -3,7 +3,7 @@ pub mod stdio;
 
 use std::{collections::VecDeque, sync::LazyLock};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 use crate::cli::IoSpec;
 
@@ -52,6 +52,7 @@ pub fn parse_specs(tokens: Vec<String>) -> Result<Vec<IoSpec>> {
     let mut specs = Vec::new();
 
     while !queue.is_empty() {
+        println!("Queue: {:?}", &queue);
         let mut matched = false;
         for handler in REGISTERED_HANDLERS.iter() {
             if let Some(result) = handler.try_parse_spec(&mut queue) {
