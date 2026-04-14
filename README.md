@@ -1,14 +1,14 @@
 # konfg
 
-`konfg` (_Konfig ForGed_) is a powerful Rust-based CLI tool designed to build and merge configuration files. It supports **YAML**, **JSON**, **TOML** and **dotenv** formats and leverages **Jinja2** templating to allow dynamic configuration values.
+`konfg` (_Konfig ForGed_) is a powerful Rust-based CLI tool designed to build and merge configuration files. It supports **YAML**, **JSON**, **TOML**, **properties**, and **dotenv** formats and leverages **Jinja2** templating to allow dynamic configuration values.
 
 ## Key Features
 
-- **Multi-format Support**: Seamlessly merge and convert between YAML, JSON, TOML and dotenv.
+- **Multi-format Support**: Seamlessly merge and convert between YAML, JSON, TOML, properties, and dotenv.
 - **Deep Merging**: Intelligently merges nested objects. Later files overwrite values of earlier files.
 - **Jinja2 Templating**: Use `minijinja` to power your configurations. Access CLI parameters and previously merged values directly within your templates.
-- **Flexible I/O**: Support for URL-like schemes for specifying input/output formats and destinations (e.g., `stdio-yaml://`, `file-json://`, `stdio-toml://`, `file-dotenv://`).
-- **Format Auto-detection**: Automatically detects formats based on file extensions or explicit URL schemes.
+- **Flexible I/O**: Support for multiple input sources and output destinations via `stdio` and `file` handlers.
+- **Format Auto-detection**: Automatically detects formats based on file extensions or explicit CLI tokens.
 
 ## Installation
 
@@ -21,24 +21,21 @@ cargo build --release
 ## Usage
 
 ```bash
-konfg <templates...> [options]
+konfg build [options]
 ```
 
-### Positional Arguments
-- `<templates...>`: A list of paths or URLs to Jinja template files.
-
 ### Options
+
+- `-i`, `--in <tokens...>`: Input specification. Can be used multiple times.
+  - `stdio <format>`: Read from standard input as `<format>`.
+  - `file <path> <format>`: Read from `<path>` as `<format>`.
+  - `file <path>`: Read from `<path>`, detecting format by extension.
+  - `<path>`: Shorthand for `file <path>`.
+- `-o`, `--out <tokens...>`: Output specification. (Default: `stdio yaml`).
+  - `<format>`: Shorthand for `stdio <format>`.
+  - `stdio <format>`: Write to standard output as `<format>`.
+  - `file <path> <format>`: Write to `<path>` as `<format>`.
 - `-p`, `--param <KEY=VALUE>`: Specify parameters available in Jinja context. Can be used multiple times. Supports dotted notation (e.g., `my.param=value`).
-- `-o`, `--output <TARGET>`: Path or URL to the output file. (Default: `stdio-yaml://`).
-
-### Input & Output URL Schemes
-
-`konfg` uses a URI-like syntax to handle different formats and sources:
-
-- `file:///path/to/file.json`: Detects format by extension.
-- `file-yaml:///path/to/file.conf`: Forces YAML format regardless of extension.
-- `stdio-toml://`: Reads standard input as TOML.
-- `stdio-json://`: Writes the merged result to standard output as JSON.
 
 ## Merging Logic
 
@@ -67,7 +64,7 @@ some_dict:
 
 ### Command
 ```bash
-konfg first.yaml second.yaml --param my.param=awesome
+konfg build -i first.yaml -i second.yaml -p my.param=awesome
 ```
 
 ### Output (YAML)
@@ -83,7 +80,8 @@ some_dict:
 - **YAML** (`.yaml`, `.yml`)
 - **JSON** (`.json`)
 - **TOML** (`.toml`)
-- *dotenv* (`.env`)
+- **Properties** (`.properties`)
+- **dotenv** (`.env`)
 
 ## License
 GPL-3.0

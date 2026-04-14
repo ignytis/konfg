@@ -18,8 +18,8 @@ impl Endpoint {
     /// (e.g. `"yaml"`, `"json"`), and an optional path.
     pub fn new(kind: &str, format: &str, path: &str) -> Result<Self> {
         Ok(Self {
-            io: io::get_handler(kind)?,
-            format: format_handlers::get_handler(format)?,
+            io: io::get_handler_for_io_kind(kind)?,
+            format: format_handlers::get_handler_for_format(format)?,
             path: path.to_string(),
         })
     }

@@ -3,7 +3,7 @@ pub mod stdio;
 
 use std::{collections::VecDeque, sync::LazyLock};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use crate::cli::IoSpec;
 
@@ -36,7 +36,7 @@ impl Clone for Box<dyn IoHandler> {
 }
 
 /// Factory method to get the appropriate IO handler for the given kind ("file" or "stdio").
-pub fn get_handler(kind: &str) -> Result<Box<dyn IoHandler>> {
+pub fn get_handler_for_io_kind(kind: &str) -> Result<Box<dyn IoHandler>> {
     for handler in REGISTERED_HANDLERS.iter() {
         if handler.supports(kind) {
             return Ok(handler.clone());
@@ -52,7 +52,6 @@ pub fn parse_specs(tokens: Vec<String>) -> Result<Vec<IoSpec>> {
     let mut specs = Vec::new();
 
     while !queue.is_empty() {
-        println!("Queue: {:?}", &queue);
         let mut matched = false;
         for handler in REGISTERED_HANDLERS.iter() {
             if let Some(result) = handler.try_parse_spec(&mut queue) {

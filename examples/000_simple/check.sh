@@ -12,9 +12,9 @@ echo "-----"
 echo ""
 
 echo "Actual: "
-./target/debug/konfg \
-    file-yaml://$PWD/examples/000_simple/in_0.yaml \
-    file-yaml:///$PWD/examples/000_simple/in_1.yaml \
+./target/debug/konfg build \
+    -i file $PWD/examples/000_simple/in_0.yaml yaml \
+    -i file $PWD/examples/000_simple/in_1.yaml yaml \
     \
     --param my.param=awesome
 

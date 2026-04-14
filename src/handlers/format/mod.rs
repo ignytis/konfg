@@ -6,7 +6,7 @@ mod yaml;
 
 use std::sync::LazyLock;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde_json::Value;
 
 const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new(|| {
@@ -23,10 +23,16 @@ const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn FormatHandler>>> = LazyLock::new
 pub trait FormatHandler: Send + Sync {
     fn parse(&self, content: &str) -> Result<Value>;
     fn serialize(&self, value: &Value) -> Result<String>;
-    /// Checks if this handler supports the given format name, e.g. "yaml", "json", "toml".
-    fn supports(&self, format: &str) -> bool;
+    fn get_format_name(&self) -> &'static str;
     /// Clones the handler into a boxed trait object.
     fn clone_box(&self) -> Box<dyn FormatHandler>;
+
+    /// Checks if this handler supports the given format name, e.g. "yaml", "json", "toml".
+    fn supports(&self, format: &str) -> bool {
+        return self.get_format_name() == format;
+    }
+    /// Get file extensions for this handler.
+    fn get_file_extensions(&self) -> Vec<&'static str>;
 }
 
 impl Clone for Box<dyn FormatHandler> {
@@ -37,7 +43,7 @@ impl Clone for Box<dyn FormatHandler> {
 
 /// Factory method to get the appropriate format handler for the given format name.
 /// Iterates over all registered handlers and returns the first one that supports the format.
-pub fn get_handler(format: &str) -> Result<Box<dyn FormatHandler>> {
+pub fn get_handler_for_format(format: &str) -> Result<Box<dyn FormatHandler>> {
     for handler in REGISTERED_HANDLERS.iter() {
         if handler.supports(format) {
             return Ok(handler.clone());
@@ -47,37 +53,48 @@ pub fn get_handler(format: &str) -> Result<Box<dyn FormatHandler>> {
     Err(anyhow!("No format handler found for: {}", format))
 }
 
+/// Factory method to get the appropriate IO handler for the given file extension.
+pub fn get_handler_for_file_extension(extension: &str) -> Result<Box<dyn FormatHandler>> {
+    for handler in REGISTERED_HANDLERS.iter() {
+        if handler.get_file_extensions().contains(&extension) {
+            return Ok(handler.clone());
+        }
+    }
+
+    Err(anyhow!("No IO handler found for extension: {}", extension))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_get_handler_json() {
-        assert!(get_handler("json").is_ok());
+        assert!(get_handler_for_format("json").is_ok());
     }
 
     #[test]
     fn test_get_handler_yaml() {
-        assert!(get_handler("yaml").is_ok());
+        assert!(get_handler_for_format("yaml").is_ok());
     }
 
     #[test]
     fn test_get_handler_toml() {
-        assert!(get_handler("toml").is_ok());
+        assert!(get_handler_for_format("toml").is_ok());
     }
 
     #[test]
     fn test_get_handler_properties() {
-        assert!(get_handler("properties").is_ok());
+        assert!(get_handler_for_format("properties").is_ok());
     }
 
     #[test]
     fn test_get_handler_dotenv() {
-        assert!(get_handler("dotenv").is_ok());
+        assert!(get_handler_for_format("dotenv").is_ok());
     }
 
     #[test]
     fn test_get_handler_unknown() {
-        assert!(get_handler("unknown").is_err());
+        assert!(get_handler_for_format("unknown").is_err());
     }
 }

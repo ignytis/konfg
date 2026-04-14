@@ -1,6 +1,6 @@
 pub mod build;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 
 use crate::cli::build::BuildArgs;
@@ -45,4 +45,3 @@ pub enum Commands {
     /// Build configuration
     Build(BuildArgs),
 }
-

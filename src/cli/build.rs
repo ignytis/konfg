@@ -1,10 +1,9 @@
-
 use anyhow::{Context, Result};
 use clap::Args;
 use serde_json::Value;
 
 use crate::{
-    cli::{IoSpec, parse_output_spec},
+    cli::{parse_output_spec, IoSpec},
     handlers::io::parse_specs,
     jinja::JinjaEngine,
     types::endpoint::Endpoint,

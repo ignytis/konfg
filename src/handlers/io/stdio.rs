@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::io::{Read, Write};
 
 use crate::cli::IoSpec;

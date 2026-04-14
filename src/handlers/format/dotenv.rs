@@ -11,6 +11,14 @@ use crate::{
 pub struct DotenvHandler;
 
 impl FormatHandler for DotenvHandler {
+    fn get_format_name(&self) -> &'static str {
+        "dotenv"
+    }
+
+    fn get_file_extensions(&self) -> Vec<&'static str> {
+        vec!["env"]
+    }
+
     fn parse(&self, content: &str) -> Result<Value> {
         let iter = dotenvy::Iter::new(content.as_bytes());
         let mut props = std::collections::HashMap::new();
@@ -28,10 +36,6 @@ impl FormatHandler for DotenvHandler {
             res.push_str(&format!("{}={}\n", k, v));
         }
         Ok(res)
-    }
-
-    fn supports(&self, format: &str) -> bool {
-        format == "dotenv"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {

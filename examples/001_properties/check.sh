@@ -12,10 +12,10 @@ echo "-----"
 echo ""
 
 echo "Actual: "
-./target/debug/konfg \
-    file-properties://$PWD/examples/001_properties/in.properties \
+./target/debug/konfg build \
+    -i file $PWD/examples/001_properties/in.properties properties \
     \
     --param user=john \
-    -o stdio-properties://
+    -o properties
 
 echo "====== TEST END ====="

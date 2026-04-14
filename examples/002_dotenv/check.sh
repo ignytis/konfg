@@ -12,9 +12,9 @@ echo "-----"
 echo ""
 
 echo "Actual Dotenv: "
-./target/debug/konfg \
-    file-dotenv://examples/002_dotenv/in.env \
+./target/debug/konfg build \
+    -i file examples/002_dotenv/in.env dotenv \
     --param dbname=mydb \
-    -o stdio-dotenv://
+    -o dotenv
 
 echo "====== TEST END ====="

@@ -9,21 +9,20 @@
 - **Multi-format Support:** Merge YAML, JSON, TOML, Properties (`.properties`), and Dotenv (`.env`) files.
 - **Jinja2 Templating:** Power your configurations with `minijinja`. Access CLI parameters and previously merged configuration values within templates.
 - **Deep Merging:** Intelligently merges nested objects. Arrays are replaced wholesale (later values win).
-- **Flexible Input/Output:** Supports URL-like schemes for specifying input and output formats and destinations (e.g., `stdio-yaml://`, `file-json://path/to/file.conf`, `stdio-toml://`).
-- **Format Auto-detection:** Automatically detects formats based on file extensions or explicitly provided schemes.
+- **Flexible Input/Output:** Supports multiple input sources and output destinations via `stdio` and `file` handlers.
+- **Format Auto-detection:** Automatically detects formats based on file extensions or explicitly provided tokens.
 
 ## Architecture
 
 The project is structured into modular components:
 
-- **`src/main.rs`:** Entry point, orchestrates the processing loop (reading, rendering, and merging).
-- **`src/cli.rs`:** CLI parsing (via `clap`) and parameter handling.
-- **`src/format_handlers/`:** Implementations for parsing and serializing different configuration formats.
-- **`src/io/`:** Handles reading from and writing to different targets (files, stdin/stdout).
-- **`src/types/`:** Common types and format detection logic.
-- **`src/utils/`:** Utility functions for deep merging, parameter handling, and URI parsing.
+- **`src/main.rs`:** Entry point, orchestrates the command execution.
+- **`src/cli/`:** CLI parsing (via `clap`) and command implementations (e.g., `build`).
+- **`src/handlers/format/`:** Implementations for parsing and serializing different configuration formats.
+- **`src/handlers/io/`:** Handles reading from and writing to different targets (files, stdin/stdout).
+- **`src/types/`:** Common types like `Endpoint` and `IoSpec`.
+- **`src/utils/`:** Utility functions for deep merging (`cfg_values`) and parameter handling (`hashmap`).
 - **`src/jinja.rs`:** Jinja2 template rendering logic.
-- **`src/output.rs`:** Logic for managing the final merged configuration output.
 
 ## Code style
 

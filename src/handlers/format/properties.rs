@@ -4,11 +4,21 @@ use serde_json::Value;
 use crate::handlers::format::FormatHandler;
 use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
+const EXTENSION: &str = "properties";
+
 /// A handler for managing Java properties configuration files.
 #[derive(Clone)]
 pub struct PropertiesHandler;
 
 impl FormatHandler for PropertiesHandler {
+    fn get_format_name(&self) -> &'static str {
+        EXTENSION
+    }
+
+    fn get_file_extensions(&self) -> Vec<&'static str> {
+        vec![EXTENSION]
+    }
+
     fn parse(&self, content: &str) -> Result<Value> {
         let props = java_properties::read(content.as_bytes())?;
         Ok(hashmap_new_from_flat_hashmap(props, "."))

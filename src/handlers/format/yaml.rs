@@ -8,16 +8,20 @@ use crate::handlers::format::FormatHandler;
 pub struct YamlHandler;
 
 impl FormatHandler for YamlHandler {
+    fn get_format_name(&self) -> &'static str {
+        "yaml"
+    }
+
+    fn get_file_extensions(&self) -> Vec<&'static str> {
+        vec!["yml", "yaml"]
+    }
+
     fn parse(&self, content: &str) -> Result<Value> {
         Ok(serde_yaml::from_str(content)?)
     }
 
     fn serialize(&self, value: &Value) -> Result<String> {
         Ok(serde_yaml::to_string(value)?)
-    }
-
-    fn supports(&self, format: &str) -> bool {
-        format == "yaml"
     }
 
     fn clone_box(&self) -> Box<dyn FormatHandler> {

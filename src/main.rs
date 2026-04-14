@@ -7,9 +7,7 @@ mod utils;
 use anyhow::Result;
 use clap::Parser;
 
-use crate::{
-    cli::{Cli, Commands, build::build},
-};
+use crate::cli::{build::build, Cli, Commands};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -18,4 +16,3 @@ fn main() -> Result<()> {
         Commands::Build(args) => build(args),
     }
 }
-
