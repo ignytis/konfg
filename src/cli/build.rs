@@ -1,14 +1,24 @@
-use anyhow::{Context, Result};
+use std::collections::VecDeque;
+
+use anyhow::Result;
 use clap::Args;
 use serde_json::Value;
 
 use crate::{
-    cli::{parse_output_spec, IoSpec},
-    handlers::io::parse_specs,
+    handlers::io::parse_tokens,
     jinja::JinjaEngine,
     types::endpoint::Endpoint,
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
 };
+
+#[derive(Clone, Default, PartialEq)]
+enum ParsingMode {
+    #[default]
+    Begin,
+    Input,
+    Output,
+    Param,
+}
 
 /// Arguments for the build command.
 ///
@@ -19,87 +29,95 @@ use crate::{
 #[derive(Args)]
 pub struct BuildArgs {
     /// Positional tokens describing inputs and output.
-    #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true)]
+    #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true, allow_hyphen_values = true)]
     pub tokens: Vec<String>,
-
-    /// Parameters available in Jinja context as `key=value`.
-    #[arg(short = 'p', long = "param")]
-    pub params: Vec<String>,
 }
 
 pub fn build(args: BuildArgs) -> Result<()> {
+    // Parse positional tokens into input tokens and output tokens using a queue-style state machine.
+    // Expected form: --in <input-tokens> [--in <input-tokens> ...] --out <output-tokens>
+    let mut queue: VecDeque<String> = args.tokens.into_iter().collect();
+    let mut buffer: Vec<String> = Vec::new();
+    let mut mode: ParsingMode = ParsingMode::default();
+
+    let mut inputs: Vec<Vec<String>> = Vec::new();
+    let mut output: Vec<String> = Vec::new();
+    let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
+
+    while let Some(tok) = queue.pop_front() {
+        let new_mode = match tok.as_str() {
+            // FIXME: buffer is not flushed here because -i .. -i ... does not change the mode
+            "--in" | "-i" => ParsingMode::Input,
+            "--out" | "-o" => ParsingMode::Output,
+            "--param" | "-p" => ParsingMode::Param,
+            _ => mode.clone(),
+        };
+
+        if tok.is_empty() || mode != new_mode {
+            // End of args or mode changed: finalize the current mode
+            match mode {
+                ParsingMode::Begin => {}
+                ParsingMode::Input => {
+                    inputs.push(buffer.clone());
+                }
+                ParsingMode::Output => {
+                    if !output.is_empty() {
+                        return Err(anyhow::anyhow!("Output is provided multiple times"));
+                    }
+                    output = buffer.clone();
+                }
+                ParsingMode::Param => {
+                    match buffer.len() {
+                        1 => params.push(buffer.remove(0)),
+                        0 => return Err(anyhow::anyhow!(
+                                "No parameter is specified after -p or --param"
+                            )),
+                        num_params => return Err(anyhow::anyhow!(
+                                "{} parameters specified after -p or --param. Expected exactly one parameter.",
+                                num_params
+                            )),
+                    };
+                }
+            };
+            buffer.clear();
+
+            mode = new_mode.clone();
+        } else if mode == new_mode {
+            // same mode: add items to buffer
+            buffer.push(tok);
+        }
+    }
+
+    if inputs.is_empty() {
+        return Err(anyhow::anyhow!("No input is provided"));
+    }
+
+    let inputs: Vec<Endpoint> = inputs
+        .iter()
+        .map(|tokens| parse_tokens(tokens))
+        .collect::<Result<Vec<Endpoint>, _>>()?;
+
+    let output: Endpoint = if output.is_empty() {
+        // No output provided - set YAML + stdout as default
+        parse_tokens(&vec!["stdio".to_string(), "yaml".to_string()])?
+    } else {
+        parse_tokens(&output)?
+    };
+    let params = hashmap_new_from_kv_params(&params)?;
+
     let jinja = JinjaEngine::new();
 
-    let params = hashmap_new_from_kv_params(&args.params)?;
-
-    // Parse positional tokens into input tokens and output tokens using a queue-style state machine.
-    // Expected form: --in <input-tokens> [--in <input-tokens> ...] [--out <output-tokens>]
-    use std::collections::VecDeque;
-    let mut queue: VecDeque<String> = args.tokens.into_iter().collect();
-    let mut inputs_flat: Vec<String> = Vec::new();
-    let mut output_tokens: Vec<String> = Vec::new();
-
-    let mut mode: Option<&str> = None;
-    while let Some(tok) = queue.pop_front() {
-        if tok == "--in" {
-            mode = Some("in");
-            continue;
-        } else if tok == "--out" {
-            mode = Some("out");
-            continue;
-        }
-
-        match mode {
-            Some("in") => inputs_flat.push(tok),
-            Some("out") => output_tokens.push(tok),
-            None => anyhow::bail!("Unexpected token '{}' before any --in/--out", tok),
-            _ => unreachable!(),
-        }
-    }
-
-    if output_tokens.is_empty() {
-        output_tokens = vec!["yaml".to_string()];
-    }
-
-    let output_spec = parse_output_spec(&output_tokens)?;
-    let output = match &output_spec {
-        IoSpec::File { path, format } => Endpoint::new("file", format, path)?,
-        IoSpec::Stdio { format } => Endpoint::new("stdio", format, "")?,
-    };
-
     let mut merged: Value = Value::Object(Default::default());
-    let mut jinja_ctx: serde_json::Map<String, Value> = params.clone();
+    let jinja_ctx: serde_json::Map<String, Value> = params.clone();
 
-    for spec in parse_specs(inputs_flat)? {
-        let (kind, format, path) = match &spec {
-            IoSpec::File { path, format } => ("file", format.as_str(), path.as_str()),
-            IoSpec::Stdio { format } => ("stdio", format.as_str(), ""),
-        };
-        let label = format!("{kind}:{path}");
-        let source = Endpoint::new(kind, format, path)
-            .with_context(|| format!("Failed to create endpoint for '{label}'"))?;
-
-        let raw = source
-            .read()
-            .with_context(|| format!("Failed to read '{label}'"))?;
-        let rendered = jinja
-            .render(&raw, &jinja_ctx)
-            .with_context(|| format!("Jinja rendering failed for '{label}'"))?;
-        let value = source
-            .format()
-            .parse(&rendered)
-            .with_context(|| format!("Failed to parse '{label}'"))?;
+    for input in &inputs {
+        let raw = input.read()?;
+        let rendered = jinja.render(&raw, &jinja_ctx)?;
+        let value = input.parse(rendered.as_str())?;
 
         cfg_values_deep_merge(&mut merged, value.clone())?;
-
-        if let Value::Object(obj) = &value {
-            for (k, v) in obj {
-                if !v.is_object() && !v.is_array() {
-                    jinja_ctx.insert(k.clone(), v.clone());
-                }
-            }
-        }
     }
 
-    output.write(&merged)
+    output.write(&merged)?;
+    Ok(())
 }

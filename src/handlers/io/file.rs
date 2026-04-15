@@ -5,9 +5,10 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
-use crate::cli::IoSpec;
-
-use crate::{handlers::format, handlers::io::IoHandler};
+use crate::{
+    handlers::{format, io::IoHandler},
+    types::endpoint::Endpoint,
+};
 
 const KIND: &str = "file";
 
@@ -16,12 +17,19 @@ const KIND: &str = "file";
 pub struct FileHandler;
 
 impl IoHandler for FileHandler {
-    fn read(&self, source: &str) -> Result<String> {
-        Ok(fs::read_to_string(source)?)
+    fn read(&self, path: Option<&str>) -> Result<String> {
+        match path {
+            Some(p) => Ok(fs::read_to_string(p)?),
+            None => Err(anyhow!("File handler: path is not specified")),
+        }
     }
 
-    fn write(&self, dest: &str, content: &str) -> Result<()> {
-        fs::write(dest, content)?;
+    fn write(&self, content: &str, path: Option<&str>) -> Result<()> {
+        let path = match path {
+            Some(p) => p,
+            None => return Err(anyhow!("File handler: path is not specified")),
+        };
+        fs::write(path, content)?;
         Ok(())
     }
 
@@ -33,16 +41,16 @@ impl IoHandler for FileHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Option<Result<IoSpec>> {
+    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Result<Option<Endpoint>> {
         let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
             Some(KIND) => true,
             Some(maybe_path) => {
                 if !Path::new(maybe_path).exists() {
-                    return None;
+                    return Ok(None);
                 }
                 false
             }
-            None => return None,
+            None => return Ok(None),
         };
         if is_first_token_kind_keyword {
             tokens.pop_front();
@@ -50,7 +58,7 @@ impl IoHandler for FileHandler {
 
         let path = match tokens.pop_front() {
             Some(v) => v,
-            None => return Some(Err(anyhow!("file: missing path"))),
+            None => return Err(anyhow!("file: missing path")),
         };
 
         // Check the next token. If it is supported format, use it. Otherwise try to guess the format from filename
@@ -61,11 +69,11 @@ impl IoHandler for FileHandler {
 
         // Try to get handler by next token
         let format_handler = match format::get_handler_for_format(next_token_maybe_format) {
-            Ok(h) => {
+            Some(h) => {
                 tokens.pop_front();
                 h
             }
-            Err(_) => {
+            None => {
                 let ext = Path::new(path.as_str())
                     .extension()
                     .and_then(OsStr::to_str)
@@ -73,15 +81,18 @@ impl IoHandler for FileHandler {
                 match format::get_handler_for_file_extension(ext) {
                     Ok(h) => h,
                     Err(_) => {
-                        return Some(Err(anyhow!(
+                        return Err(anyhow!(
                         "Failed to find the format handler using CLI arguments or file extension"
-                    )))
+                    ))
                     }
                 }
             }
         };
 
-        let format = format_handler.get_format_name().to_string();
-        Some(Ok(IoSpec::File { path, format }))
+        Ok(Some(Endpoint::new(
+            self.clone_box(),
+            Some(format_handler),
+            Some(path),
+        )))
     }
 }

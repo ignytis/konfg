@@ -43,14 +43,14 @@ impl Clone for Box<dyn FormatHandler> {
 
 /// Factory method to get the appropriate format handler for the given format name.
 /// Iterates over all registered handlers and returns the first one that supports the format.
-pub fn get_handler_for_format(format: &str) -> Result<Box<dyn FormatHandler>> {
+pub fn get_handler_for_format(format: &str) -> Option<Box<dyn FormatHandler>> {
     for handler in REGISTERED_HANDLERS.iter() {
         if handler.supports(format) {
-            return Ok(handler.clone());
+            return Some(handler.clone());
         }
     }
 
-    Err(anyhow!("No format handler found for: {}", format))
+    None
 }
 
 /// Factory method to get the appropriate IO handler for the given file extension.

@@ -5,7 +5,7 @@ use std::{collections::VecDeque, sync::LazyLock};
 
 use anyhow::{anyhow, Result};
 
-use crate::cli::IoSpec;
+use crate::types::endpoint::Endpoint;
 
 const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> =
     LazyLock::new(|| vec![Box::new(stdio::StdioHandler), Box::new(file::FileHandler)]);
@@ -13,10 +13,10 @@ const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> =
 /// Trait for handling input/output operations.
 pub trait IoHandler: Send + Sync {
     /// Reads raw content from the source.
-    fn read(&self, source: &str) -> Result<String>;
+    fn read(&self, path: Option<&str>) -> Result<String>;
 
     /// Writes serialized content to the destination.
-    fn write(&self, dest: &str, content: &str) -> Result<()>;
+    fn write(&self, content: &str, path: Option<&str>) -> Result<()>;
 
     /// Checks if this handler supports the given kind, e.g. "file" or "stdio".
     fn supports(&self, kind: &str) -> bool;
@@ -26,7 +26,7 @@ pub trait IoHandler: Send + Sync {
 
     /// Attempts to pop tokens from `tokens` and construct an `IoSpec`.
     /// Returns `None` if the first token is not supported by this handler.
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Option<Result<IoSpec>>;
+    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Result<Option<Endpoint>>;
 }
 
 impl Clone for Box<dyn IoHandler> {
@@ -35,35 +35,22 @@ impl Clone for Box<dyn IoHandler> {
     }
 }
 
-/// Factory method to get the appropriate IO handler for the given kind ("file" or "stdio").
-pub fn get_handler_for_io_kind(kind: &str) -> Result<Box<dyn IoHandler>> {
-    for handler in REGISTERED_HANDLERS.iter() {
-        if handler.supports(kind) {
-            return Ok(handler.clone());
+/// Parses a flat list of tokens into a `Vec<Endpoint>` using registered handlers.
+/// token = a list of string parameters for single input / output.
+/// Example: ['file', '/path/to/file.cfg', 'yaml']
+pub fn parse_tokens(tokens: &Vec<String>) -> Result<Endpoint> {
+    let mut queue: VecDeque<String> = tokens.clone().into();
+    // let mut specs = Vec::new();
+
+    for io_handler in REGISTERED_HANDLERS.iter() {
+        match io_handler.try_parse_spec(&mut queue) {
+            Ok(opt_endpoint) => match opt_endpoint {
+                Some(e) => return Ok(e),
+                None => continue,
+            },
+            Err(e) => return Err(e),
         }
     }
 
-    Err(anyhow!("No IO handler found for: {}", kind))
-}
-
-/// Parses a flat list of tokens into a `Vec<IoSpec>` by delegating to registered handlers.
-pub fn parse_specs(tokens: Vec<String>) -> Result<Vec<IoSpec>> {
-    let mut queue: VecDeque<String> = tokens.into();
-    let mut specs = Vec::new();
-
-    while !queue.is_empty() {
-        let mut matched = false;
-        for handler in REGISTERED_HANDLERS.iter() {
-            if let Some(result) = handler.try_parse_spec(&mut queue) {
-                specs.push(result?);
-                matched = true;
-                break;
-            }
-        }
-        if !matched {
-            return Err(anyhow!("Unrecognized input token: {:?}", queue.front()));
-        }
-    }
-
-    Ok(specs)
+    return Err(anyhow!("Unrecognized input token: {:?}", tokens));
 }
