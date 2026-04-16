@@ -60,7 +60,7 @@ pub fn build(args: BuildArgs) -> Result<()> {
     let params = hashmap_new_from_kv_params(&parsed_args.params)?;
 
     let jinja = JinjaEngine::new();
-    let jinja_ctx: serde_json::Map<String, Value> = params.clone();
+    let mut jinja_ctx: Value = params.into();
     let mut merged: Value = Value::Object(Default::default());
 
     for input in &inputs {
@@ -69,6 +69,9 @@ pub fn build(args: BuildArgs) -> Result<()> {
         let value = input.parse(rendered.as_str())?;
 
         cfg_values_deep_merge(&mut merged, value.clone())?;
+        // Update context. Values from the previous iterations could be re-used
+        // in the next iterations
+        cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
     }
 
     output.write(&merged)?;

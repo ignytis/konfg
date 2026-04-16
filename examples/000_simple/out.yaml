@@ -1,5 +1,0 @@
-base_value: "hello"
-derived_value: "hello world"
-some_dict:
-    nested_key: "overwritten"
-    new_key: "awesome"

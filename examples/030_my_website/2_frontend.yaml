@@ -1,0 +1,2 @@
+url:
+  frontend_news: {{ url.api }}/news

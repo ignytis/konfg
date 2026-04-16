@@ -1,6 +1,5 @@
 use anyhow::Result;
 use minijinja::Environment;
-use serde_json::Value;
 
 pub struct JinjaEngine {
     env: Environment<'static>,
@@ -12,11 +11,7 @@ impl JinjaEngine {
         Self { env }
     }
 
-    pub fn render<S: Into<String>>(
-        &self,
-        template: S,
-        ctx: &serde_json::Map<String, Value>,
-    ) -> Result<String> {
+    pub fn render<S: Into<String>>(&self, template: S, ctx: &serde_json::Value) -> Result<String> {
         match self
             .env
             .render_named_str("configuration", template.into().as_str(), ctx)
