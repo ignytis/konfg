@@ -11,6 +11,14 @@ use crate::{
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
 };
 
+/// Constants for command-line arguments.
+pub const TOKEN_INPUT_SHORT: &str = "-i";
+pub const TOKEN_INPUT_LONG: &str = "--input";
+pub const TOKEN_OUTPUT_SHORT: &str = "-o";
+pub const TOKEN_OUTPUT_LONG: &str = "--output";
+pub const TOKEN_PARAM_SHORT: &str = "-p";
+pub const TOKEN_PARAM_LONG: &str = "--param";
+
 /// Arguments for the build command.
 ///
 /// Positional tokens are used to describe inputs and output. Use `--in` to start an input spec
@@ -35,15 +43,15 @@ pub fn build(args: BuildArgs) -> Result<()> {
 
     while let Some(tok) = queue.pop_front() {
         match tok.as_str() {
-            "--in" | "-i" => {
+            TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
                 let mut buf: VecDeque<String> = VecDeque::new();
                 while let Some(next) = queue.front() {
-                    if next == "--in"
-                        || next == "-i"
-                        || next == "--out"
-                        || next == "-o"
-                        || next == "--param"
-                        || next == "-p"
+                    if next == TOKEN_INPUT_SHORT
+                        || next == TOKEN_INPUT_LONG
+                        || next == TOKEN_OUTPUT_SHORT
+                        || next == TOKEN_OUTPUT_LONG
+                        || next == TOKEN_PARAM_SHORT
+                        || next == TOKEN_PARAM_LONG
                     {
                         break;
                     }
@@ -51,18 +59,18 @@ pub fn build(args: BuildArgs) -> Result<()> {
                 }
                 inputs.push(buf);
             }
-            "--out" | "-o" => {
+            TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
                 if output.is_some() {
                     return Err(anyhow::anyhow!("Output is provided multiple times"));
                 }
                 let mut buf: VecDeque<String> = VecDeque::new();
                 while let Some(next) = queue.front() {
-                    if next == "--in"
-                        || next == "-i"
-                        || next == "--out"
-                        || next == "-o"
-                        || next == "--param"
-                        || next == "-p"
+                    if next == TOKEN_INPUT_SHORT
+                        || next == TOKEN_INPUT_LONG
+                        || next == TOKEN_OUTPUT_SHORT
+                        || next == TOKEN_OUTPUT_LONG
+                        || next == TOKEN_PARAM_SHORT
+                        || next == TOKEN_PARAM_LONG
                     {
                         break;
                     }
@@ -70,7 +78,7 @@ pub fn build(args: BuildArgs) -> Result<()> {
                 }
                 output = Some(buf);
             }
-            "--param" | "-p" => match queue.pop_front() {
+            TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
                 Some(p) => params.push(p),
                 None => {
                     return Err(anyhow::anyhow!(
