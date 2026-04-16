@@ -160,10 +160,7 @@ mod tests {
 
     #[test]
     fn test_hashmap_new_from_kv_params_simple() -> Result<()> {
-        let params = vec![
-            "key1=val1".to_string(),
-            "key2=val2".to_string(),
-        ];
+        let params = vec!["key1=val1".to_string(), "key2=val2".to_string()];
 
         let result = hashmap_new_from_kv_params(&params)?;
         assert_eq!(

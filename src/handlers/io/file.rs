@@ -44,7 +44,7 @@ impl IoHandler for FileHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
+    fn try_parse_tokens(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
         let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
             Some(KIND) => true,
             Some(maybe_path) => {

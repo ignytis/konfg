@@ -125,10 +125,7 @@ mod tests {
 
         cfg_values_deep_merge(&mut dst, src)?;
 
-        assert_eq!(
-            dst,
-            json!(["c", "d"])
-        );
+        assert_eq!(dst, json!(["c", "d"]));
 
         Ok(())
     }

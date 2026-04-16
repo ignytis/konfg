@@ -36,7 +36,7 @@ pub trait IoHandler: Send + Sync {
 
     /// Attempts to pop tokens from `tokens` and construct an `Endpoint`.
     /// Returns `TryParseResult::NotSupported` if the first token is not supported by this handler.
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> TryParseResult;
+    fn try_parse_tokens(&self, tokens: &mut VecDeque<String>) -> TryParseResult;
 }
 
 impl Clone for Box<dyn IoHandler> {
@@ -50,7 +50,7 @@ impl Clone for Box<dyn IoHandler> {
 /// Example: ['file', '/path/to/file.cfg', 'yaml']
 pub fn parse_tokens(mut tokens: VecDeque<String>) -> Result<Endpoint> {
     for io_handler in REGISTERED_HANDLERS.iter() {
-        match io_handler.try_parse_spec(&mut tokens) {
+        match io_handler.try_parse_tokens(&mut tokens) {
             TryParseResult::Success(e) => return Ok(e),
             TryParseResult::NotSupported => continue,
             TryParseResult::Error(e) => return Err(e),
