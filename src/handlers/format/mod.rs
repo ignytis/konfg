@@ -70,31 +70,42 @@ mod tests {
 
     #[test]
     fn test_get_handler_json() {
-        assert!(get_handler_for_format("json").is_ok());
+        let handler = get_handler_for_format("json");
+        assert!(handler.is_some(), "JSON handler should be registered");
+        assert!(handler.unwrap().supports("json"), "JSON handler should support 'json'");
     }
 
     #[test]
     fn test_get_handler_yaml() {
-        assert!(get_handler_for_format("yaml").is_ok());
+        let handler = get_handler_for_format("yaml");
+        assert!(handler.is_some(), "YAML handler should be registered");
+        assert!(handler.unwrap().supports("yaml"), "YAML handler should support 'yaml'");
     }
 
     #[test]
     fn test_get_handler_toml() {
-        assert!(get_handler_for_format("toml").is_ok());
+        let handler = get_handler_for_format("toml");
+        assert!(handler.is_some(), "TOML handler should be registered");
+        assert!(handler.unwrap().supports("toml"), "TOML handler should support 'toml'");
     }
 
     #[test]
     fn test_get_handler_properties() {
-        assert!(get_handler_for_format("properties").is_ok());
+        let handler = get_handler_for_format("properties");
+        assert!(handler.is_some(), "Properties handler should be registered");
+        assert!(handler.unwrap().supports("properties"), "Properties handler should support 'properties'");
     }
 
     #[test]
     fn test_get_handler_dotenv() {
-        assert!(get_handler_for_format("dotenv").is_ok());
+        let handler = get_handler_for_format("dotenv");
+        assert!(handler.is_some(), "Dotenv handler should be registered");
+        assert!(handler.unwrap().supports("dotenv"), "Dotenv handler should support 'dotenv'");
     }
 
     #[test]
     fn test_get_handler_unknown() {
-        assert!(get_handler_for_format("unknown").is_err());
+        let handler = get_handler_for_format("unknown");
+        assert!(handler.is_none(), "Unknown format should not have a handler");
     }
 }
