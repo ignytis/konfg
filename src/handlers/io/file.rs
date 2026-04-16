@@ -6,7 +6,10 @@ use std::fs;
 use std::path::Path;
 
 use crate::{
-    handlers::{format, io::IoHandler},
+    handlers::{
+        format,
+        io::{IoHandler, TryParseResult},
+    },
     types::endpoint::Endpoint,
 };
 
@@ -41,16 +44,16 @@ impl IoHandler for FileHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Result<Option<Endpoint>> {
+    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
         let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
             Some(KIND) => true,
             Some(maybe_path) => {
                 if !Path::new(maybe_path).exists() {
-                    return Ok(None);
+                    return TryParseResult::NotSupported;
                 }
                 false
             }
-            None => return Ok(None),
+            None => return TryParseResult::NotSupported,
         };
         if is_first_token_kind_keyword {
             tokens.pop_front();
@@ -58,7 +61,7 @@ impl IoHandler for FileHandler {
 
         let path = match tokens.pop_front() {
             Some(v) => v,
-            None => return Err(anyhow!("file: missing path")),
+            None => return TryParseResult::Error(anyhow!("file: missing path")),
         };
 
         // Check the next token. If it is supported format, use it. Otherwise try to guess the format from filename
@@ -81,18 +84,18 @@ impl IoHandler for FileHandler {
                 match format::get_handler_for_file_extension(ext) {
                     Ok(h) => h,
                     Err(_) => {
-                        return Err(anyhow!(
-                        "Failed to find the format handler using CLI arguments or file extension"
-                    ))
+                        return TryParseResult::Error(anyhow!(
+                            "Failed to find the format handler using CLI arguments or file extension"
+                        ));
                     }
                 }
             }
         };
 
-        Ok(Some(Endpoint::new(
+        TryParseResult::Success(Endpoint::new(
             self.clone_box(),
             Some(format_handler),
             Some(path),
-        )))
+        ))
     }
 }

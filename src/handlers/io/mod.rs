@@ -10,6 +10,16 @@ use crate::types::endpoint::Endpoint;
 const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> =
     LazyLock::new(|| vec![Box::new(stdio::StdioHandler), Box::new(file::FileHandler)]);
 
+/// Result of attempting to parse tokens by a handler.
+pub enum TryParseResult {
+    /// Arguments were successfully parsed into Endpoint
+    Success(Endpoint),
+    /// Parser does not support the provided input
+    NotSupported,
+    /// Parser supports the provided input, but an error occurred
+    Error(anyhow::Error),
+}
+
 /// Trait for handling input/output operations.
 pub trait IoHandler: Send + Sync {
     /// Reads raw content from the source.
@@ -24,9 +34,9 @@ pub trait IoHandler: Send + Sync {
     /// Clones the handler into a boxed trait object.
     fn clone_box(&self) -> Box<dyn IoHandler>;
 
-    /// Attempts to pop tokens from `tokens` and construct an `IoSpec`.
-    /// Returns `None` if the first token is not supported by this handler.
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Result<Option<Endpoint>>;
+    /// Attempts to pop tokens from `tokens` and construct an `Endpoint`.
+    /// Returns `TryParseResult::NotSupported` if the first token is not supported by this handler.
+    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> TryParseResult;
 }
 
 impl Clone for Box<dyn IoHandler> {
@@ -35,20 +45,15 @@ impl Clone for Box<dyn IoHandler> {
     }
 }
 
-/// Parses a flat list of tokens into a `Vec<Endpoint>` using registered handlers.
-/// token = a list of string parameters for single input / output.
+/// Parses a flat list of tokens into an `Endpoint` using registered handlers.
+/// `tokens` is a VecDeque of string parameters for single input / output.
 /// Example: ['file', '/path/to/file.cfg', 'yaml']
-pub fn parse_tokens(tokens: &Vec<String>) -> Result<Endpoint> {
-    let mut queue: VecDeque<String> = tokens.clone().into();
-    // let mut specs = Vec::new();
-
+pub fn parse_tokens(mut tokens: VecDeque<String>) -> Result<Endpoint> {
     for io_handler in REGISTERED_HANDLERS.iter() {
-        match io_handler.try_parse_spec(&mut queue) {
-            Ok(opt_endpoint) => match opt_endpoint {
-                Some(e) => return Ok(e),
-                None => continue,
-            },
-            Err(e) => return Err(e),
+        match io_handler.try_parse_spec(&mut tokens) {
+            TryParseResult::Success(e) => return Ok(e),
+            TryParseResult::NotSupported => continue,
+            TryParseResult::Error(e) => return Err(e),
         }
     }
 

@@ -11,15 +11,6 @@ use crate::{
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
 };
 
-#[derive(Clone, Default, PartialEq)]
-enum ParsingMode {
-    #[default]
-    Begin,
-    Input,
-    Output,
-    Param,
-}
-
 /// Arguments for the build command.
 ///
 /// Positional tokens are used to describe inputs and output. Use `--in` to start an input spec
@@ -34,57 +25,62 @@ pub struct BuildArgs {
 }
 
 pub fn build(args: BuildArgs) -> Result<()> {
-    // Parse positional tokens into input tokens and output tokens using a queue-style state machine.
-    // Expected form: --in <input-tokens> [--in <input-tokens> ...] --out <output-tokens>
+    // Simplified token parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
+    // tokens into argument lists until the next flag or end of input.
     let mut queue: VecDeque<String> = args.tokens.into_iter().collect();
-    let mut buffer: Vec<String> = Vec::new();
-    let mut mode: ParsingMode = ParsingMode::default();
 
-    let mut inputs: Vec<Vec<String>> = Vec::new();
-    let mut output: Vec<String> = Vec::new();
+    let mut inputs: Vec<VecDeque<String>> = Vec::new();
+    let mut output: Option<VecDeque<String>> = None;
     let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
 
     while let Some(tok) = queue.pop_front() {
-        let new_mode = match tok.as_str() {
-            // FIXME: buffer is not flushed here because -i .. -i ... does not change the mode
-            "--in" | "-i" => ParsingMode::Input,
-            "--out" | "-o" => ParsingMode::Output,
-            "--param" | "-p" => ParsingMode::Param,
-            _ => mode.clone(),
-        };
-
-        if tok.is_empty() || mode != new_mode {
-            // End of args or mode changed: finalize the current mode
-            match mode {
-                ParsingMode::Begin => {}
-                ParsingMode::Input => {
-                    inputs.push(buffer.clone());
-                }
-                ParsingMode::Output => {
-                    if !output.is_empty() {
-                        return Err(anyhow::anyhow!("Output is provided multiple times"));
+        match tok.as_str() {
+            "--in" | "-i" => {
+                let mut buf: VecDeque<String> = VecDeque::new();
+                while let Some(next) = queue.front() {
+                    if next == "--in"
+                        || next == "-i"
+                        || next == "--out"
+                        || next == "-o"
+                        || next == "--param"
+                        || next == "-p"
+                    {
+                        break;
                     }
-                    output = buffer.clone();
+                    buf.push_back(queue.pop_front().unwrap());
                 }
-                ParsingMode::Param => {
-                    match buffer.len() {
-                        1 => params.push(buffer.remove(0)),
-                        0 => return Err(anyhow::anyhow!(
-                                "No parameter is specified after -p or --param"
-                            )),
-                        num_params => return Err(anyhow::anyhow!(
-                                "{} parameters specified after -p or --param. Expected exactly one parameter.",
-                                num_params
-                            )),
-                    };
+                inputs.push(buf);
+            }
+            "--out" | "-o" => {
+                if output.is_some() {
+                    return Err(anyhow::anyhow!("Output is provided multiple times"));
                 }
-            };
-            buffer.clear();
-
-            mode = new_mode.clone();
-        } else if mode == new_mode {
-            // same mode: add items to buffer
-            buffer.push(tok);
+                let mut buf: VecDeque<String> = VecDeque::new();
+                while let Some(next) = queue.front() {
+                    if next == "--in"
+                        || next == "-i"
+                        || next == "--out"
+                        || next == "-o"
+                        || next == "--param"
+                        || next == "-p"
+                    {
+                        break;
+                    }
+                    buf.push_back(queue.pop_front().unwrap());
+                }
+                output = Some(buf);
+            }
+            "--param" | "-p" => match queue.pop_front() {
+                Some(p) => params.push(p),
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "No parameter is specified after -p or --param"
+                    ));
+                }
+            },
+            other => {
+                return Err(anyhow::anyhow!("Unexpected token: {}", other));
+            }
         }
     }
 
@@ -93,16 +89,18 @@ pub fn build(args: BuildArgs) -> Result<()> {
     }
 
     let inputs: Vec<Endpoint> = inputs
-        .iter()
+        .into_iter()
         .map(|tokens| parse_tokens(tokens))
         .collect::<Result<Vec<Endpoint>, _>>()?;
 
-    let output: Endpoint = if output.is_empty() {
-        // No output provided - set YAML + stdout as default
-        parse_tokens(&vec!["stdio".to_string(), "yaml".to_string()])?
-    } else {
-        parse_tokens(&output)?
+    let output: Endpoint = match output {
+        Some(tokens) if !tokens.is_empty() => parse_tokens(tokens)?,
+        _ => parse_tokens(VecDeque::from(vec![
+            "stdio".to_string(),
+            "yaml".to_string(),
+        ]))?,
     };
+
     let params = hashmap_new_from_kv_params(&params)?;
 
     let jinja = JinjaEngine::new();

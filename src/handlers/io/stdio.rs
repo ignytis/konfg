@@ -4,7 +4,9 @@ use anyhow::{anyhow, Result};
 use std::io::{Read, Write};
 
 use crate::{
-    handlers::format::get_handler_for_format, handlers::io::IoHandler, types::endpoint::Endpoint,
+    handlers::format::get_handler_for_format,
+    handlers::io::{IoHandler, TryParseResult},
+    types::endpoint::Endpoint,
 };
 
 /// Handles standard input/output operations.
@@ -31,21 +33,23 @@ impl IoHandler for StdioHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> Result<Option<Endpoint>> {
+    fn try_parse_spec(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
         if tokens.front().map(String::as_str) != Some("stdio") {
-            return Ok(None);
+            return TryParseResult::NotSupported;
         }
         tokens.pop_front();
         let format = match tokens.pop_front() {
             Some(v) => v,
-            None => return Err(anyhow!("stdio: missing format")),
+            None => return TryParseResult::Error(anyhow!("stdio: missing format")),
         };
 
         let format_handler = match get_handler_for_format(&format) {
             Some(h) => Some(h),
-            None => return Err(anyhow!("stdio handler: unknown format {}", format)),
+            None => {
+                return TryParseResult::Error(anyhow!("stdio handler: unknown format {}", format));
+            }
         };
 
-        Ok(Some(Endpoint::new(self.clone_box(), format_handler, None)))
+        TryParseResult::Success(Endpoint::new(self.clone_box(), format_handler, None))
     }
 }
