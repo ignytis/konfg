@@ -19,6 +19,13 @@ pub const TOKEN_OUTPUT_LONG: &str = "--output";
 pub const TOKEN_PARAM_SHORT: &str = "-p";
 pub const TOKEN_PARAM_LONG: &str = "--param";
 
+/// Arguments parsed by 'do_parse_tokens' function
+struct ParsedArgs {
+    inputs: Vec<VecDeque<String>>,
+    output: Option<VecDeque<String>>,
+    params: Vec<String>,
+}
+
 /// Arguments for the build command.
 ///
 /// Positional tokens are used to describe inputs and output. Use `--in` to start an input spec
@@ -33,49 +40,60 @@ pub struct BuildArgs {
 }
 
 pub fn build(args: BuildArgs) -> Result<()> {
-    // Simplified token parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
-    // tokens into argument lists until the next flag or end of input.
-    let mut queue: VecDeque<String> = args.tokens.into_iter().collect();
+    let parsed_args = do_parse_tokens(args.tokens)?;
+    if parsed_args.inputs.is_empty() {
+        return Err(anyhow::anyhow!("No input is provided"));
+    }
 
+    let inputs: Vec<Endpoint> = parsed_args
+        .inputs
+        .into_iter()
+        .map(|tokens| parse_tokens(tokens))
+        .collect::<Result<Vec<Endpoint>, _>>()?;
+    let output: Endpoint = match parsed_args.output {
+        Some(tokens) if !tokens.is_empty() => parse_tokens(tokens)?,
+        _ => parse_tokens(VecDeque::from(vec![
+            "stdio".to_string(),
+            "yaml".to_string(),
+        ]))?,
+    };
+    let params = hashmap_new_from_kv_params(&parsed_args.params)?;
+
+    let jinja = JinjaEngine::new();
+    let jinja_ctx: serde_json::Map<String, Value> = params.clone();
+    let mut merged: Value = Value::Object(Default::default());
+
+    for input in &inputs {
+        let raw = input.read()?;
+        let rendered = jinja.render(&raw, &jinja_ctx)?;
+        let value = input.parse(rendered.as_str())?;
+
+        cfg_values_deep_merge(&mut merged, value.clone())?;
+    }
+
+    output.write(&merged)?;
+    Ok(())
+}
+
+// Token parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
+// tokens into argument lists until the next flag or end of input.
+fn do_parse_tokens(tokens: Vec<String>) -> Result<ParsedArgs> {
     let mut inputs: Vec<VecDeque<String>> = Vec::new();
     let mut output: Option<VecDeque<String>> = None;
     let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
 
+    let mut queue: VecDeque<String> = tokens.into_iter().collect();
     while let Some(tok) = queue.pop_front() {
         match tok.as_str() {
             TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
-                let mut buf: VecDeque<String> = VecDeque::new();
-                while let Some(next) = queue.front() {
-                    if next == TOKEN_INPUT_SHORT
-                        || next == TOKEN_INPUT_LONG
-                        || next == TOKEN_OUTPUT_SHORT
-                        || next == TOKEN_OUTPUT_LONG
-                        || next == TOKEN_PARAM_SHORT
-                        || next == TOKEN_PARAM_LONG
-                    {
-                        break;
-                    }
-                    buf.push_back(queue.pop_front().unwrap());
-                }
+                let buf = parse_arg_buffer(&mut queue);
                 inputs.push(buf);
             }
             TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
                 if output.is_some() {
                     return Err(anyhow::anyhow!("Output is provided multiple times"));
                 }
-                let mut buf: VecDeque<String> = VecDeque::new();
-                while let Some(next) = queue.front() {
-                    if next == TOKEN_INPUT_SHORT
-                        || next == TOKEN_INPUT_LONG
-                        || next == TOKEN_OUTPUT_SHORT
-                        || next == TOKEN_OUTPUT_LONG
-                        || next == TOKEN_PARAM_SHORT
-                        || next == TOKEN_PARAM_LONG
-                    {
-                        break;
-                    }
-                    buf.push_back(queue.pop_front().unwrap());
-                }
+                let buf = parse_arg_buffer(&mut queue);
                 output = Some(buf);
             }
             TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
@@ -92,38 +110,30 @@ pub fn build(args: BuildArgs) -> Result<()> {
         }
     }
 
-    if inputs.is_empty() {
-        return Err(anyhow::anyhow!("No input is provided"));
+    Ok(ParsedArgs {
+        inputs,
+        output,
+        params,
+    })
+}
+
+/// Consumes the buffer of all arguments by writing arguments from there
+/// into buffer for current endpoint until end of endpoint data is reached.
+/// Returns a buffer with arguments for current endpoint.
+fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
+    let mut buf: VecDeque<String> = VecDeque::new();
+    while let Some(next) = buf_all.front() {
+        if next == TOKEN_INPUT_SHORT
+            || next == TOKEN_INPUT_LONG
+            || next == TOKEN_OUTPUT_SHORT
+            || next == TOKEN_OUTPUT_LONG
+            || next == TOKEN_PARAM_SHORT
+            || next == TOKEN_PARAM_LONG
+        {
+            break;
+        }
+        buf.push_back(buf_all.pop_front().unwrap());
     }
 
-    let inputs: Vec<Endpoint> = inputs
-        .into_iter()
-        .map(|tokens| parse_tokens(tokens))
-        .collect::<Result<Vec<Endpoint>, _>>()?;
-
-    let output: Endpoint = match output {
-        Some(tokens) if !tokens.is_empty() => parse_tokens(tokens)?,
-        _ => parse_tokens(VecDeque::from(vec![
-            "stdio".to_string(),
-            "yaml".to_string(),
-        ]))?,
-    };
-
-    let params = hashmap_new_from_kv_params(&params)?;
-
-    let jinja = JinjaEngine::new();
-
-    let mut merged: Value = Value::Object(Default::default());
-    let jinja_ctx: serde_json::Map<String, Value> = params.clone();
-
-    for input in &inputs {
-        let raw = input.read()?;
-        let rendered = jinja.render(&raw, &jinja_ctx)?;
-        let value = input.parse(rendered.as_str())?;
-
-        cfg_values_deep_merge(&mut merged, value.clone())?;
-    }
-
-    output.write(&merged)?;
-    Ok(())
+    buf
 }
