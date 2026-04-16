@@ -37,3 +37,113 @@ pub fn cfg_values_deep_merge(dst: &mut Value, src: Value) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_cfg_values_deep_merge_simple() -> Result<()> {
+        let mut dst = json!({
+            "key1": "val1",
+            "key2": "val2"
+        });
+        let src = json!({
+            "key3": "val3"
+        });
+
+        cfg_values_deep_merge(&mut dst, src)?;
+
+        assert_eq!(
+            dst,
+            json!({
+                "key1": "val1",
+                "key2": "val2",
+                "key3": "val3"
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cfg_values_deep_merge_overwrite() -> Result<()> {
+        let mut dst = json!({
+            "key1": "val1",
+            "key2": "val2"
+        });
+        let src = json!({
+            "key1": "new_val1"
+        });
+
+        cfg_values_deep_merge(&mut dst, src)?;
+
+        assert_eq!(
+            dst,
+            json!({
+                "key1": "new_val1",
+                "key2": "val2"
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cfg_values_deep_merge_nested() -> Result<()> {
+        let mut dst = json!({
+            "key1": {
+                "subkey1": "val1"
+            }
+        });
+        let src = json!({
+            "key1": {
+                "subkey2": "val2"
+            }
+        });
+
+        cfg_values_deep_merge(&mut dst, src)?;
+
+        assert_eq!(
+            dst,
+            json!({
+                "key1": {
+                    "subkey1": "val1",
+                    "subkey2": "val2"
+                }
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cfg_values_deep_merge_array() -> Result<()> {
+        let mut dst = json!(["a", "b"]);
+        let src = json!(["c", "d"]);
+
+        cfg_values_deep_merge(&mut dst, src)?;
+
+        assert_eq!(
+            dst,
+            json!(["c", "d"])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cfg_values_deep_merge_type_mismatch() -> Result<()> {
+        let mut dst = json!({
+            "key1": "val1"
+        });
+        let src = json!({
+            "key1": ["a", "b"]
+        });
+
+        assert!(cfg_values_deep_merge(&mut dst, src).is_err());
+
+        Ok(())
+    }
+}

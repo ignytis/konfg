@@ -157,4 +157,109 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_hashmap_new_from_kv_params_simple() -> Result<()> {
+        let params = vec![
+            "key1=val1".to_string(),
+            "key2=val2".to_string(),
+        ];
+
+        let result = hashmap_new_from_kv_params(&params)?;
+        assert_eq!(
+            json!(result),
+            json!({
+                "key1": "val1",
+                "key2": "val2"
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hashmap_new_from_kv_params_nested() -> Result<()> {
+        let params = vec![
+            "a.b.c=val1".to_string(),
+            "a.b.d=val2".to_string(),
+            "x.y=val3".to_string(),
+        ];
+
+        let result = hashmap_new_from_kv_params(&params)?;
+        assert_eq!(
+            json!(result),
+            json!({
+                "a": {
+                    "b": {
+                        "c": "val1",
+                        "d": "val2"
+                    }
+                },
+                "x": {
+                    "y": "val3"
+                }
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hashmap_flatten_simple() {
+        let value = json!({
+            "key1": "val1",
+            "key2": "val2"
+        });
+
+        let result = hashmap_flatten(&value, "", ".", false);
+        assert_eq!(
+            result,
+            HashMap::from([
+                ("key1".to_string(), "val1".to_string()),
+                ("key2".to_string(), "val2".to_string())
+            ])
+        );
+    }
+
+    #[test]
+    fn test_hashmap_flatten_nested() {
+        let value = json!({
+            "a": {
+                "b": {
+                    "c": "val1",
+                    "d": "val2"
+                }
+            },
+            "x": {
+                "y": "val3"
+            }
+        });
+
+        let result = hashmap_flatten(&value, "", ".", false);
+        assert_eq!(
+            result,
+            HashMap::from([
+                ("a.b.c".to_string(), "val1".to_string()),
+                ("a.b.d".to_string(), "val2".to_string()),
+                ("x.y".to_string(), "val3".to_string())
+            ])
+        );
+    }
+
+    #[test]
+    fn test_hashmap_flatten_uppercase() {
+        let value = json!({
+            "key1": "val1",
+            "key2": "val2"
+        });
+
+        let result = hashmap_flatten(&value, "", ".", true);
+        assert_eq!(
+            result,
+            HashMap::from([
+                ("KEY1".to_string(), "val1".to_string()),
+                ("KEY2".to_string(), "val2".to_string())
+            ])
+        );
+    }
 }
