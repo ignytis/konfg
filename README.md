@@ -55,6 +55,9 @@ https://docs.rs/minijinja/latest/minijinja/functions/index.html#built-in-functio
 In addition, the following functions are defined:
 
 - `env(name, default = '')` - read an environment variable
+- `md5(input)` - MD5 hash
+- `sha256(input)` - SHA256 hash
+- `sha512(input)` - SHA512 hash
 
 ### Filters
 
