@@ -26,6 +26,7 @@ impl JinjaEngine {
 }
 
 fn register_functions(env: &mut Environment) {
+    env.add_function("command", functions::command);
     env.add_function("env", functions::env);
     env.add_function("md5", functions::md5);
     env.add_function("sha256", functions::sha256);

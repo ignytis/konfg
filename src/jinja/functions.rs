@@ -1,7 +1,7 @@
 use std::env;
-
+use std::process::{Command, Stdio};
 use anyhow::Result;
-use minijinja::Error;
+use minijinja::{Error, ErrorKind};
 
 use md5::Md5;
 use sha2::{Digest, Sha256, Sha512};
@@ -39,6 +39,27 @@ pub fn sha512(input: &str) -> Result<String, Error> {
     hasher.update(input);
     let result = format!("{:x}", hasher.finalize());
     Ok(result)
+}
+
+/// Executes a system command using the provided vector of strings
+pub fn command(commands: Vec<String>) -> Result<String, Error> {
+    let command_str: String = commands.join(" ");
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(&command_str)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output();
+    let output = match output {
+        Ok(output) => output,
+        Err(e) => return Err(Error::new(ErrorKind::UndefinedError, format!("Failed to execute a command '{}': {}", command_str, e))),
+    };
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(Error::new(ErrorKind::UndefinedError, format!("Failed to execute a command '{}'", command_str)))
+    }
 }
 
 #[cfg(test)]
@@ -88,5 +109,10 @@ mod tests {
     #[test]
     fn test_sha512() {
         assert_eq!(sha512("hello").unwrap(), "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043");
+    }
+
+    #[test]
+    fn test_system_failure() {
+        assert!(command(vec![String::from("nonexistent_command")]).is_err());
     }
 }

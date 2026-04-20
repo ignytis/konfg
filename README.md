@@ -54,6 +54,7 @@ https://docs.rs/minijinja/latest/minijinja/functions/index.html#built-in-functio
 
 In addition, the following functions are defined:
 
+- `command(['arg1', 'arg2', ...])` - execute a system comand (_a pro tip: the output could be splitted using `lines` filter)
 - `env(name, default = '')` - read an environment variable
 - `md5(input)` - MD5 hash
 - `sha256(input)` - SHA256 hash
