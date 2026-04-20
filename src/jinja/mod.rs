@@ -1,3 +1,5 @@
+mod functions;
+
 use anyhow::Result;
 use minijinja::Environment;
 
@@ -7,7 +9,8 @@ pub struct JinjaEngine {
 
 impl JinjaEngine {
     pub fn new() -> Self {
-        let env = Environment::new();
+        let mut env = Environment::new();
+        register_functions(&mut env);
         Self { env }
     }
 
@@ -20,4 +23,8 @@ impl JinjaEngine {
             Err(e) => Err(e.into()),
         }
     }
+}
+
+fn register_functions(env: &mut Environment) {
+    env.add_function("env", functions::env);
 }

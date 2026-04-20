@@ -45,6 +45,29 @@ konfg build [options]
    - Values passed via `--param` are available in all templates.
    - Scalar values (strings, numbers, booleans) from previously merged files are automatically added to the Jinja context for subsequent templates.
 
+## Jinja
+
+### Funcions
+
+Minijinja builtins are enabled; see the document:
+https://docs.rs/minijinja/latest/minijinja/functions/index.html#built-in-functions
+
+In addition, the following functions are defined:
+
+- `env(name, default = '')` - read an environment variable
+
+### Filters
+
+Standarad Minijinja filters are available:
+https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions
+
+
+### Tests
+
+See Minijinja for standard tests like `is defined`:
+https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions
+
+
 ## Example
 
 ### `first.yaml`
