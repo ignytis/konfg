@@ -1,7 +1,7 @@
-use std::env;
-use std::process::{Command, Stdio};
 use anyhow::Result;
 use minijinja::{Error, ErrorKind};
+use std::env;
+use std::process::{Command, Stdio};
 
 use md5::Md5;
 use sha2::{Digest, Sha256, Sha512};
@@ -52,13 +52,21 @@ pub fn command(commands: Vec<String>) -> Result<String, Error> {
         .output();
     let output = match output {
         Ok(output) => output,
-        Err(e) => return Err(Error::new(ErrorKind::UndefinedError, format!("Failed to execute a command '{}': {}", command_str, e))),
+        Err(e) => {
+            return Err(Error::new(
+                ErrorKind::UndefinedError,
+                format!("Failed to execute a command '{}': {}", command_str, e),
+            ))
+        }
     };
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(Error::new(ErrorKind::UndefinedError, format!("Failed to execute a command '{}'", command_str)))
+        Err(Error::new(
+            ErrorKind::UndefinedError,
+            format!("Failed to execute a command '{}'", command_str),
+        ))
     }
 }
 
