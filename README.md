@@ -87,11 +87,13 @@ derived_value: "{{ base_value }} world"
 some_dict:
     nested_key: "overwritten"
     new_key: "{{ my.param }}"
+env_value: {{ env('MY_ENV_VAR', 'default')  }}
 ```
 
 ### Command
 ```bash
-konfg build -i first.yaml -i second.yaml -p my.param=awesome
+MY_ENV_VAR=this_is_env \
+  konfg build -i first.yaml -i second.yaml -p my.param=awesome
 ```
 
 ### Output (YAML)
@@ -101,6 +103,7 @@ derived_value: "hello world"
 some_dict:
     nested_key: "overwritten"
     new_key: "awesome"
+env_value: this_is_env
 ```
 
 ### More Examples
