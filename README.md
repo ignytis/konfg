@@ -109,8 +109,27 @@ env_value: this_is_env
 ### More Examples
 
 #### 1. Convert YAML to JSON
+
+**`config.yaml`**
+```yaml
+app:
+  name: "myapp"
+  port: 8080
+```
+
+**Command**
 ```bash
 konfg build -i config.yaml -o stdio json
+```
+
+**Output**
+```json
+{
+  "app": {
+    "name": "myapp",
+    "port": 8080
+  }
+}
 ```
 
 #### 2. Merge `.env` with Deep Nesting
@@ -152,9 +171,64 @@ app:
 konfg build -i config.yaml -p my_secret=topsecret
 ```
 
+**Output**
+```yaml
+app:
+  files:
+  - cli
+  - handlers
+  - jinja
+  - main.rs
+  - types
+  - utils
+  secret_hash: 53336a676c64c1396553b2b7c92f38126768827c93b64d9142069c10eda7a721
+  version: 1.0.0
+```
+
+#### 4. Merge from Environment Variables
+You can use the `env` input handler to read all environment variables with a specific prefix. It supports nested structures using `__` as a separator.
+
+**Command**
+```bash
+export MYAPP__SERVER__PORT=9000
+export MYAPP__DB__USER=admin
+konfg build -i config.yaml -i env MYAPP -o stdio json
+```
+
+**Output**
+```json
+{
+  "app": {
+    "files": [
+      "cli",
+      "handlers",
+      "jinja",
+      "main.rs",
+      "types",
+      "utils"
+    ],
+    "secret_hash": "53336a676c64c1396553b2b7c92f38126768827c93b64d9142069c10eda7a721",
+    "version": "1.0.0"
+  },
+  "db": {
+    "user": "admin"
+  },
+  "server": {
+    "port": "9000"
+  }
+}
+```
+
 ---
 
+## Supported inputs and outputs:
+
+- Files (see `Supported formats` below)
+- Stdin/Stdout
+- Environment variables (input only)
+
 ## Supported Formats
+
 - **YAML** (`.yaml`, `.yml`)
 - **JSON** (`.json`)
 - **TOML** (`.toml`)

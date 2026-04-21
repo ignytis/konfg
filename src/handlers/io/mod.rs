@@ -1,3 +1,4 @@
+pub mod env;
 pub mod file;
 pub mod stdio;
 
@@ -7,8 +8,13 @@ use anyhow::{anyhow, Result};
 
 use crate::types::endpoint::Endpoint;
 
-const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> =
-    LazyLock::new(|| vec![Box::new(stdio::StdioHandler), Box::new(file::FileHandler)]);
+const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> = LazyLock::new(|| {
+    vec![
+        Box::new(stdio::StdioHandler),
+        Box::new(file::FileHandler),
+        Box::new(env::EnvHandler),
+    ]
+});
 
 /// Result of attempting to parse tokens by a handler.
 pub enum TryParseResult {

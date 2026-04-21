@@ -1,4 +1,4 @@
-mod dotenv;
+pub mod dotenv;
 mod json;
 mod properties;
 mod toml;
