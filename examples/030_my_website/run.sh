@@ -3,7 +3,7 @@
 # This example demonstrates re-use of previous files in context for next files.
 # Base URL from `0_base.yaml` is propagated to API urls
 # Usage:
-# 
+#
 # Basic example - no additional parameters, use cargo run command
 # $ ./examples/030_my_website/run.sh
 #

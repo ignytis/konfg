@@ -1,0 +1,8 @@
+system:
+  user: "{{ env('USER', 'guest') }}"
+  os: "{{ command(['uname', '-a']) | trim }}"
+security:
+  api_key_hash: "{{ sha256(my.api_key) }}"
+project:
+  files_count: {{ command(['ls', '-1']) | lines | length }}
+  src_files: {{ command(['ls', '-1', 'src']) | lines }}

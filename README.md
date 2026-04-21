@@ -32,9 +32,9 @@ konfg build [options]
   - `file <path>`: Read from `<path>`, detecting format by extension.
   - `<path>`: Shorthand for `file <path>`.
 - `-o`, `--out <tokens...>`: Output specification. (Default: `stdio yaml`).
-  - `<format>`: Shorthand for `stdio <format>`.
   - `stdio <format>`: Write to standard output as `<format>`.
   - `file <path> <format>`: Write to `<path>` as `<format>`.
+  - `file <path>`: Write to `<path>`, detecting format by extension.
 - `-p`, `--param <KEY=VALUE>`: Specify parameters available in Jinja context. Can be used multiple times. Supports dotted notation (e.g., `my.param=value`).
 
 ## Merging Logic
@@ -62,7 +62,7 @@ In addition, the following functions are defined:
 
 ### Filters
 
-Standarad Minijinja filters are available:
+Standard Minijinja filters are available:
 https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions
 
 
@@ -102,6 +102,54 @@ some_dict:
     nested_key: "overwritten"
     new_key: "awesome"
 ```
+
+### More Examples
+
+#### 1. Convert YAML to JSON
+```bash
+konfg build -i config.yaml -o stdio json
+```
+
+#### 2. Merge `.env` with Deep Nesting
+`konfg` supports `__` as a separator for nested keys in `.env` files.
+
+**`database.env`**
+```env
+DB__HOST=localhost
+DB__PORT=5432
+```
+
+**Command**
+```bash
+konfg build -i database.env -o stdio json
+```
+**Output**
+```json
+{
+  "db": {
+    "host": "localhost",
+    "port": "5432"
+  }
+}
+```
+
+#### 3. Use Jinja Functions
+`konfg` provides several useful functions for your templates.
+
+**`config.yaml`**
+```yaml
+app:
+  version: "{{ env('APP_VERSION', '1.0.0') }}"
+  secret_hash: "{{ sha256(my_secret) }}"
+  files: {{ command(['ls', '-1', 'src']) | lines }}
+```
+
+**Command**
+```bash
+konfg build -i config.yaml -p my_secret=topsecret
+```
+
+---
 
 ## Supported Formats
 - **YAML** (`.yaml`, `.yml`)

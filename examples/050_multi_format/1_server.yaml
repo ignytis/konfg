@@ -1,0 +1,5 @@
+server:
+  port: 8080
+  workers: 4
+database:
+  host: db.production.local
