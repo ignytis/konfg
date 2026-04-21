@@ -9,6 +9,8 @@ use crate::{
     types::endpoint::Endpoint,
 };
 
+const KIND: &str = "stdio";
+
 /// Handles standard input/output operations.
 #[derive(Clone)]
 pub struct StdioHandler;
@@ -26,7 +28,7 @@ impl IoHandler for StdioHandler {
     }
 
     fn supports(&self, kind: &str) -> bool {
-        kind == "stdio"
+        kind == KIND
     }
 
     fn clone_box(&self) -> Box<dyn IoHandler> {
@@ -34,7 +36,7 @@ impl IoHandler for StdioHandler {
     }
 
     fn try_parse_tokens(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
-        if tokens.front().map(String::as_str) != Some("stdio") {
+        if tokens.front().map(String::as_str) != Some(KIND) {
             return TryParseResult::NotSupported;
         }
         tokens.pop_front();
