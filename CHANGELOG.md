@@ -1,3 +1,7 @@
+## 0.1.1 - 2026-05-12
+
+Just added CI for Docker
+
 ## 0.1.0 - 2026-04-22
 
 The first release.

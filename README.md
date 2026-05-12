@@ -47,7 +47,7 @@ konfg build [options]
 
 ## Jinja
 
-### Funcions
+### Functions
 
 Minijinja builtins are enabled; see the document:
 https://docs.rs/minijinja/latest/minijinja/functions/index.html#built-in-functions
