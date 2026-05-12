@@ -10,6 +10,72 @@
 - **Flexible I/O**: Support for multiple input sources and output destinations via `stdio` and `file` handlers.
 - **Format Auto-detection**: Automatically detects formats based on file extensions or explicit CLI tokens.
 
+## Try me in Docker!
+
+There is a [Docker image](https://hub.docker.com/r/ignytis/konfg) built for each Git tag. You can use it:
+- To quickly try the application in order to understand if you need it at all
+- To run it in Init container inside Kubernetes cluster to build configuration for your app
+
+_The commands below have networking disabled, so you can be sure that no side magic happens on app execution_
+
+The first example, zero-file (standard input-output only):
+
+```bash
+echo -n '{"category": {"some_key": "some value"}}' | \
+  docker run --rm \
+    --network none \
+    -i ignytis/konfg:latest \
+    build \
+      -i stdio json \
+      -o stdio toml
+
+# Output
+[category]
+some_key = "some value"
+```
+
+Let's enrich it with configuration from environment:
+
+```bash
+echo -n '{"category": {"some_key": "some value"}}' | \
+  docker run --rm \
+    --network none \
+    -e EXAMPLE__CATEGORY__ENV_VAR=env_value \
+    -i ignytis/konfg:latest\
+      build \
+        -i stdio json \
+        -i env EXAMPLE \
+        -o stdio toml
+
+# Output
+[category]
+env_var = "env_value"
+some_key = "some value"
+```
+
+The second example uses config from this repository, so please clone it before running the command.
+
+```bash
+docker run --rm \
+  --network none \
+  -v $PWD/examples:/examples \
+  -it ignytis/konfg:latest \
+    build \
+      -i /examples/010_basic_conversion/config.yaml \
+      -o stdio json
+
+# Output
+{
+  "database": {
+    "url": "postgresql://localhost:5432/db"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  }
+}
+```
+
 ## Installation
 
 Ensure you have Rust and Cargo installed, then build the project:
