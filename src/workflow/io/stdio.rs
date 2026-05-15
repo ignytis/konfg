@@ -1,13 +1,10 @@
-use std::collections::VecDeque;
-
-use anyhow::{anyhow, Result};
+use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 
-use crate::{
-    handlers::format::get_handler_for_format,
-    handlers::io::{IoHandler, TryParseResult},
-    types::endpoint::Endpoint,
-};
+use anyhow::{Result, anyhow};
+
+use crate::handlers::format::get_handler_for_format;
+use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "stdio";
 
@@ -16,13 +13,13 @@ const KIND: &str = "stdio";
 pub struct StdioHandler;
 
 impl IoHandler for StdioHandler {
-    fn read(&self, _path: Option<&str>) -> Result<String> {
+    fn read(&self, _args: &HashMap<String, String>) -> Result<String> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
         Ok(buf)
     }
 
-    fn write(&self, content: &str, _path: Option<&str>) -> Result<()> {
+    fn write(&self, content: &str, _args: &HashMap<String, String>) -> Result<()> {
         std::io::stdout().write_all(content.as_bytes())?;
         Ok(())
     }
@@ -52,6 +49,6 @@ impl IoHandler for StdioHandler {
             }
         };
 
-        TryParseResult::Success(Endpoint::new(self.clone_box(), format_handler, None))
+        TryParseResult::Success(Stage::new(self.clone_box(), format_handler, HashMap::new()))
     }
 }

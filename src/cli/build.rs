@@ -5,10 +5,9 @@ use clap::Args;
 use serde_json::Value;
 
 use crate::{
-    handlers::io::parse_tokens,
     jinja::JinjaEngine,
-    types::endpoint::Endpoint,
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
+    workflow::io::{Stage, parse_tokens},
 };
 
 /// Constants for command-line arguments.
@@ -45,12 +44,12 @@ pub fn build(args: BuildArgs) -> Result<()> {
         return Err(anyhow::anyhow!("No input is provided"));
     }
 
-    let inputs: Vec<Endpoint> = parsed_args
+    let inputs: Vec<Stage> = parsed_args
         .inputs
         .into_iter()
         .map(|tokens| parse_tokens(tokens))
-        .collect::<Result<Vec<Endpoint>, _>>()?;
-    let output: Endpoint = match parsed_args.output {
+        .collect::<Result<Vec<Stage>, _>>()?;
+    let output: Stage = match parsed_args.output {
         Some(tokens) if !tokens.is_empty() => parse_tokens(tokens)?,
         _ => parse_tokens(VecDeque::from(vec![
             "stdio".to_string(),
@@ -121,8 +120,8 @@ fn do_parse_tokens(tokens: Vec<String>) -> Result<ParsedArgs> {
 }
 
 /// Consumes the buffer of all arguments by writing arguments from there
-/// into buffer for current endpoint until end of endpoint data is reached.
-/// Returns a buffer with arguments for current endpoint.
+/// into buffer for current stage until end of stage data is reached.
+/// Returns a buffer with arguments for current stage.
 fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
     let mut buf: VecDeque<String> = VecDeque::new();
     while let Some(next) = buf_all.front() {

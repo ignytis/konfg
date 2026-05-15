@@ -1,13 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
-use crate::{
-    handlers::format::dotenv::DotenvHandler,
-    handlers::io::{IoHandler, TryParseResult},
-    types::endpoint::Endpoint,
-};
+use crate::handlers::format::dotenv::DotenvHandler;
+use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "env";
 
@@ -18,9 +15,9 @@ const KIND: &str = "env";
 pub struct EnvHandler;
 
 impl IoHandler for EnvHandler {
-    fn read(&self, path: Option<&str>) -> Result<String> {
+    fn read(&self, args: &HashMap<String, String>) -> Result<String> {
         let mut res = String::new();
-        let prefix = path.unwrap_or("");
+        let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
 
         for (key, value) in env::vars() {
             if prefix.is_empty() {
@@ -36,7 +33,7 @@ impl IoHandler for EnvHandler {
         Ok(res)
     }
 
-    fn write(&self, _content: &str, _path: Option<&str>) -> Result<()> {
+    fn write(&self, _content: &str, _args: &HashMap<String, String>) -> Result<()> {
         Err(anyhow!(
             "Environment handler: writing to environment variables is not supported"
         ))
@@ -58,10 +55,15 @@ impl IoHandler for EnvHandler {
 
         let prefix = tokens.pop_front();
 
-        TryParseResult::Success(Endpoint::new(
+        let mut args = HashMap::new();
+        if let Some(p) = prefix {
+            args.insert("prefix".to_string(), p);
+        }
+
+        TryParseResult::Success(Stage::new(
             self.clone_box(),
             Some(Box::new(DotenvHandler)),
-            prefix,
+            args,
         ))
     }
 }
@@ -85,20 +87,21 @@ mod tests {
         }
 
         let handler = EnvHandler;
-        let content = handler
-            .read(Some(format!("{}__MYAPP", ENV_VAR_PREFIX).as_str()))
-            .unwrap();
+        let mut args = HashMap::new();
+        args.insert("prefix".to_string(), format!("{}__MYAPP", ENV_VAR_PREFIX));
+
+        let content = handler.read(&args).unwrap();
         let content_lines: Vec<&str> = content.trim().split("\n").collect();
 
         assert!(content_lines.len() == 2);
-        assert!(content_lines[0] == "DB__HOST=localhost");
-        assert!(content_lines[1] == "DB__PORT=5432");
+        assert!(content_lines.contains(&"DB__HOST=localhost"));
+        assert!(content_lines.contains(&"DB__PORT=5432"));
     }
 
     #[test]
     fn test_env_write_error() {
         let handler = EnvHandler;
-        let result = handler.write("content", None);
+        let result = handler.write("content", &HashMap::new());
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),

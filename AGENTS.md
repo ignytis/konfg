@@ -19,8 +19,8 @@ The project is structured into modular components:
 - **`src/main.rs`:** Entry point, orchestrates the command execution.
 - **`src/cli/`:** CLI parsing (via `clap`) and command implementations (e.g., `build`).
 - **`src/handlers/format/`:** Implementations for parsing and serializing different configuration formats.
-- **`src/handlers/io/`:** Handles reading from and writing to different targets (files, stdin/stdout).
-- **`src/types/`:** Common types like `Endpoint` and `IoSpec`.
+- **`src/workflow/io/`:** Handles reading from and writing to different targets (files, stdin/stdout).
+- **`src/workflow/`:** Workflow logic and the `Stage` structure.
 - **`src/utils/`:** Utility functions for deep merging (`cfg_values`) and parameter handling (`hashmap`).
 - **`src/jinja.rs`:** Jinja2 template rendering logic.
 

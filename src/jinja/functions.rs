@@ -56,7 +56,7 @@ pub fn command(commands: Vec<String>) -> Result<String, Error> {
             return Err(Error::new(
                 ErrorKind::UndefinedError,
                 format!("Failed to execute a command '{}': {}", command_str, e),
-            ))
+            ));
         }
     };
 
@@ -116,7 +116,10 @@ mod tests {
 
     #[test]
     fn test_sha512() {
-        assert_eq!(sha512("hello").unwrap(), "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043");
+        assert_eq!(
+            sha512("hello").unwrap(),
+            "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"
+        );
     }
 
     #[test]

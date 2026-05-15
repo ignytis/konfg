@@ -1,17 +1,12 @@
-use std::collections::VecDeque;
-
-use anyhow::{anyhow, Result};
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
-use crate::{
-    handlers::{
-        format,
-        io::{IoHandler, TryParseResult},
-    },
-    types::endpoint::Endpoint,
-};
+use anyhow::{Result, anyhow};
+
+use crate::handlers::format::{self, FormatHandler};
+use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "file";
 
@@ -20,15 +15,15 @@ const KIND: &str = "file";
 pub struct FileHandler;
 
 impl IoHandler for FileHandler {
-    fn read(&self, path: Option<&str>) -> Result<String> {
-        match path {
+    fn read(&self, args: &HashMap<String, String>) -> Result<String> {
+        match args.get("path") {
             Some(p) => Ok(fs::read_to_string(p)?),
             None => Err(anyhow!("File handler: path is not specified")),
         }
     }
 
-    fn write(&self, content: &str, path: Option<&str>) -> Result<()> {
-        let path = match path {
+    fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()> {
+        let path = match args.get("path") {
             Some(p) => p,
             None => return Err(anyhow!("File handler: path is not specified")),
         };
@@ -71,7 +66,9 @@ impl IoHandler for FileHandler {
         };
 
         // Try to get handler by next token
-        let format_handler = match format::get_handler_for_format(next_token_maybe_format) {
+        let format_handler: Box<dyn FormatHandler> = match format::get_handler_for_format(
+            next_token_maybe_format,
+        ) {
             Some(h) => {
                 tokens.pop_front();
                 h
@@ -92,10 +89,9 @@ impl IoHandler for FileHandler {
             }
         };
 
-        TryParseResult::Success(Endpoint::new(
-            self.clone_box(),
-            Some(format_handler),
-            Some(path),
-        ))
+        let mut args = HashMap::new();
+        args.insert("path".to_string(), path);
+
+        TryParseResult::Success(Stage::new(self.clone_box(), Some(format_handler), args))
     }
 }
