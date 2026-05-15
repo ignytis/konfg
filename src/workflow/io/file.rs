@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use crate::handlers::format::{self, FormatHandler};
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};

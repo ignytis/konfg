@@ -1,6 +1,6 @@
 //! Utilities for configuration values
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde_json::Value;
 
 /// Deep-merge `src` into `dst`. Later values overwrite earlier ones for scalars.

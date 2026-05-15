@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use crate::handlers::format::get_handler_for_format;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};

@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::{
     jinja::JinjaEngine,
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
-    workflow::io::{Stage, parse_tokens},
+    workflow::{io::parse_tokens, stage::Stage},
 };
 
 /// Constants for command-line arguments.
