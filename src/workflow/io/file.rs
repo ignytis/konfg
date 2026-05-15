@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 
-use crate::handlers::format::{self, FormatHandler};
+use crate::handlers::format;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "file";
@@ -66,12 +66,10 @@ impl IoHandler for FileHandler {
         };
 
         // Try to get handler by next token
-        let format_handler: Box<dyn FormatHandler> = match format::get_handler_for_format(
-            next_token_maybe_format,
-        ) {
+        let format_name: String = match format::get_handler_for_format(next_token_maybe_format) {
             Some(h) => {
                 tokens.pop_front();
-                h
+                h.get_format_name().to_string()
             }
             None => {
                 let ext = Path::new(path.as_str())
@@ -79,7 +77,7 @@ impl IoHandler for FileHandler {
                     .and_then(OsStr::to_str)
                     .unwrap_or("");
                 match format::get_handler_for_file_extension(ext) {
-                    Ok(h) => h,
+                    Ok(h) => h.get_format_name().to_string(),
                     Err(_) => {
                         return TryParseResult::Error(anyhow!(
                             "Failed to find the format handler using CLI arguments or file extension"
@@ -91,7 +89,8 @@ impl IoHandler for FileHandler {
 
         let mut args = HashMap::new();
         args.insert("path".to_string(), path);
+        args.insert("format".to_string(), format_name);
 
-        TryParseResult::Success(Stage::new(self.clone_box(), Some(format_handler), args))
+        TryParseResult::Success(Stage::new(self.clone_box(), args))
     }
 }

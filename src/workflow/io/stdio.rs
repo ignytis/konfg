@@ -3,7 +3,6 @@ use std::io::{Read, Write};
 
 use anyhow::{anyhow, Result};
 
-use crate::handlers::format::get_handler_for_format;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "stdio";
@@ -42,13 +41,9 @@ impl IoHandler for StdioHandler {
             None => return TryParseResult::Error(anyhow!("stdio: missing format")),
         };
 
-        let format_handler = match get_handler_for_format(&format) {
-            Some(h) => Some(h),
-            None => {
-                return TryParseResult::Error(anyhow!("stdio handler: unknown format {}", format));
-            }
-        };
+        let mut args = HashMap::new();
+        args.insert("format".to_string(), format);
 
-        TryParseResult::Success(Stage::new(self.clone_box(), format_handler, HashMap::new()))
+        TryParseResult::Success(Stage::new(self.clone_box(), args))
     }
 }

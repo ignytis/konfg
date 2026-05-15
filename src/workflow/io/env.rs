@@ -3,7 +3,6 @@ use std::env;
 
 use anyhow::{anyhow, Result};
 
-use crate::handlers::format::dotenv::DotenvHandler;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "env";
@@ -59,12 +58,9 @@ impl IoHandler for EnvHandler {
         if let Some(p) = prefix {
             args.insert("prefix".to_string(), p);
         }
+        args.insert("format".to_string(), "dotenv".to_string());
 
-        TryParseResult::Success(Stage::new(
-            self.clone_box(),
-            Some(Box::new(DotenvHandler)),
-            args,
-        ))
+        TryParseResult::Success(Stage::new(self.clone_box(), args))
     }
 }
 
