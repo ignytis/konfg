@@ -1,5 +1,6 @@
 pub mod env;
 pub mod file;
+pub mod param;
 pub mod stdio;
 
 use std::{
@@ -17,6 +18,7 @@ pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> = LazyLock::new
         Box::new(stdio::StdioHandler),
         Box::new(file::FileHandler),
         Box::new(env::EnvHandler),
+        Box::new(param::ParamHandler),
     ]
 });
 

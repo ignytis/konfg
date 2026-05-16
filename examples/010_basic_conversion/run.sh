@@ -9,4 +9,7 @@ set -eu
 
 app_cmd="${APP_CMD:-cargo run --}"
 
-${app_cmd} build -i $PWD/examples/010_basic_conversion/config.yaml -o stdio json
+${app_cmd} build \
+    -i $PWD/examples/010_basic_conversion/config.yaml \
+    -i param name.test john \
+    -o stdio json
