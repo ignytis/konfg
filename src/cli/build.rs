@@ -18,6 +18,19 @@ pub const TOKEN_OUTPUT_LONG: &str = "--output";
 pub const TOKEN_PARAM_SHORT: &str = "-p";
 pub const TOKEN_PARAM_LONG: &str = "--param";
 
+/// Raw arguments for the build command.
+///
+/// Positional arguments are used to describe inputs and output. Use `--in` to start an input spec
+/// and `--out` to start the output spec. All arguments after `--in` until the next `--in` or `--out`
+/// are considered part of that input. Example:
+///   --in file /path yaml --in stdio json --out yaml
+#[derive(Args)]
+pub struct BuildArgs {
+    /// Positional arguments describing inputs and output.
+    #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true, allow_hyphen_values = true)]
+    pub args: Vec<String>,
+}
+
 /// Arguments parsed by 'do_parse_args' function
 struct ParsedArgs {
     inputs: Vec<VecDeque<String>>,
@@ -69,26 +82,13 @@ impl ParsedArgs {
     }
 }
 
-/// Arguments for the build command.
-///
-/// Positional arguments are used to describe inputs and output. Use `--in` to start an input spec
-/// and `--out` to start the output spec. All arguments after `--in` until the next `--in` or `--out`
-/// are considered part of that input. Example:
-///   --in file /path yaml --in stdio json --out yaml
-#[derive(Args)]
-pub struct BuildArgs {
-    /// Positional arguments describing inputs and output.
-    #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true, allow_hyphen_values = true)]
-    pub args: Vec<String>,
-}
-
 pub fn build(build_args: BuildArgs) -> Result<()> {
     let parsed_args = ParsedArgs::try_from_vec(build_args.args)?;
     if parsed_args.inputs.is_empty() {
         return Err(anyhow::anyhow!("No input is provided"));
     }
 
-    let inputs: Vec<Stage> = parsed_args
+    let input_stages: Vec<Stage> = parsed_args
         .inputs
         .into_iter()
         .map(|args| Stage::try_from_strings(args))
@@ -106,10 +106,10 @@ pub fn build(build_args: BuildArgs) -> Result<()> {
     let mut jinja_ctx: Value = params.into();
     let mut merged: Value = Value::Object(Default::default());
 
-    for input in &inputs {
-        let raw = input.read()?;
+    for input_stage in &input_stages {
+        let raw = input_stage.read()?;
         let rendered = jinja.render(&raw, &jinja_ctx)?;
-        let value = input.parse(rendered.as_str())?;
+        let value = input_stage.parse(rendered.as_str())?;
 
         cfg_values_deep_merge(&mut merged, value.clone())?;
         // Update context. Values from the previous iterations could be re-used
