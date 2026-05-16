@@ -26,7 +26,7 @@ The project is structured into modular components:
 
 ## Code style
 
-- Format the code using `rustfmt`
+- Format the code using `cargo fmt`
 - Document the structures, functions, enums, constants and other types
 - Avoid multiple assertions on a single instructions, like `if ... = let ... = fn()`
 - Return fast
@@ -55,7 +55,7 @@ use crate::{
 ## Post-edit acctions
 
 At the end of plan execution:
-1. Format the code using `rustfmt`
+1. Format the code using `cargo fmt`
 2. Run unit tests using `cargo test`
 3. Compile the application using `cargo build`
 

@@ -8,7 +8,7 @@ mod workflow;
 use anyhow::Result;
 use clap::Parser;
 
-use crate::cli::{build::build, Cli, Commands};
+use crate::cli::{Cli, Commands, build::build};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
