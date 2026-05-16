@@ -8,8 +8,9 @@ use std::{
 };
 
 use anyhow::Result;
+use serde_json::Value;
 
-use crate::workflow::stage::Stage;
+use crate::{jinja::JinjaEngine, workflow::stage::Stage};
 
 pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> = LazyLock::new(|| {
     vec![
@@ -31,8 +32,13 @@ pub enum TryParseResult {
 
 /// Trait for handling input/output operations.
 pub trait IoHandler: Send + Sync {
-    /// Reads raw content from the source.
-    fn read(&self, args: &HashMap<String, String>) -> Result<String>;
+    /// Reads content from the source, rendering it as Jinja template if supported.
+    fn read(
+        &self,
+        args: &HashMap<String, String>,
+        jinja: &JinjaEngine,
+        context: &Value,
+    ) -> Result<String>;
 
     /// Writes serialized content to the destination.
     fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()>;
@@ -45,7 +51,7 @@ pub trait IoHandler: Send + Sync {
 
     /// Attempts to pop args and construct a `Stage`.
     /// Returns `TryParseResult::NotSupported` if the first token is not supported by this handler.
-    fn try_parse_args(&self, args: &mut VecDeque<String>) -> TryParseResult;
+    fn try_parse_args(&self, args: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult;
 }
 
 impl Clone for Box<dyn IoHandler> {

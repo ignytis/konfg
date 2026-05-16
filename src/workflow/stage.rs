@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::{
     handlers::format::get_handler_for_format,
+    jinja::JinjaEngine,
     workflow::io::{IoHandler, REGISTERED_HANDLERS, TryParseResult},
 };
 
@@ -12,16 +13,35 @@ use crate::{
 pub struct Stage {
     pub io_handler: Box<dyn IoHandler>,
     pub args: HashMap<String, String>,
+    pub jinja_engine: JinjaEngine,
 }
 
 impl Stage {
-    pub fn new(io_handler: Box<dyn IoHandler>, args: HashMap<String, String>) -> Self {
-        Self { io_handler, args }
+    pub fn new(
+        io_handler: Box<dyn IoHandler>,
+        args: HashMap<String, String>,
+        jinja_engine: JinjaEngine,
+    ) -> Self {
+        Self {
+            io_handler,
+            args,
+            jinja_engine,
+        }
     }
 
-    /// Reads raw string content from this stage.
-    pub fn read(&self) -> Result<String> {
-        self.io_handler.read(&self.args)
+    /// Reads content from this stage, renders it as Jinja template and parses it into Value.
+    pub fn read(&self, context: &Value) -> Result<Value> {
+        let rendered = self
+            .io_handler
+            .read(&self.args, &self.jinja_engine, context)?;
+        match self.args.get("format") {
+            Some(f) => get_handler_for_format(f)
+                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
+                .parse(&rendered),
+            None => Err(anyhow!(
+                "Inputs/outputs without defined formats are not supported"
+            )),
+        }
     }
 
     /// Writes serialized content to this stage.
@@ -35,23 +55,12 @@ impl Stage {
         self.io_handler.write(&serialized_value, &self.args)
     }
 
-    pub fn parse(&self, content: &str) -> Result<Value> {
-        match self.args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(content),
-            None => Err(anyhow!(
-                "Inputs/outputs without defined formats are not supported"
-            )),
-        }
-    }
-
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single input / output.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings(mut tokens: VecDeque<String>) -> Result<Stage> {
+    pub fn try_from_strings(mut tokens: VecDeque<String>, jinja: JinjaEngine) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
-            match io_handler.try_parse_args(&mut tokens) {
+            match io_handler.try_parse_args(&mut tokens, &jinja) {
                 TryParseResult::Success(s) => return Ok(s),
                 TryParseResult::NotSupported => continue,
                 TryParseResult::Error(e) => return Err(e),

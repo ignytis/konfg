@@ -3,6 +3,7 @@ mod functions;
 use anyhow::Result;
 use minijinja::Environment;
 
+#[derive(Clone)]
 pub struct JinjaEngine {
     env: Environment<'static>,
 }

@@ -3,7 +3,10 @@ use std::env;
 
 use anyhow::{Result, anyhow};
 
-use crate::workflow::io::{IoHandler, Stage, TryParseResult};
+use crate::{
+    jinja::JinjaEngine,
+    workflow::io::{IoHandler, Stage, TryParseResult},
+};
 
 const KIND: &str = "env";
 
@@ -14,7 +17,12 @@ const KIND: &str = "env";
 pub struct EnvHandler;
 
 impl IoHandler for EnvHandler {
-    fn read(&self, args: &HashMap<String, String>) -> Result<String> {
+    fn read(
+        &self,
+        args: &HashMap<String, String>,
+        _jinja: &JinjaEngine,
+        _context: &serde_json::Value,
+    ) -> Result<String> {
         let mut res = String::new();
         let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
 
@@ -46,7 +54,7 @@ impl IoHandler for EnvHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_args(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
+    fn try_parse_args(&self, tokens: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult {
         if tokens.front().map(String::as_str) != Some(KIND) {
             return TryParseResult::NotSupported;
         }
@@ -60,7 +68,7 @@ impl IoHandler for EnvHandler {
         }
         args.insert("format".to_string(), "dotenv".to_string());
 
-        TryParseResult::Success(Stage::new(self.clone_box(), args))
+        TryParseResult::Success(Stage::new(self.clone_box(), args, jinja.clone()))
     }
 }
 
@@ -86,7 +94,10 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("prefix".to_string(), format!("{}__MYAPP", ENV_VAR_PREFIX));
 
-        let content = handler.read(&args).unwrap();
+        let jinja = JinjaEngine::new();
+        let context = serde_json::Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
         let content_lines: Vec<&str> = content.trim().split("\n").collect();
 
         assert!(content_lines.len() == 2);

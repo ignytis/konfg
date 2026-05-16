@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 
 use anyhow::{Result, anyhow};
 
+use crate::jinja::JinjaEngine;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "stdio";
@@ -12,10 +13,16 @@ const KIND: &str = "stdio";
 pub struct StdioHandler;
 
 impl IoHandler for StdioHandler {
-    fn read(&self, _args: &HashMap<String, String>) -> Result<String> {
+    fn read(
+        &self,
+        _args: &HashMap<String, String>,
+        jinja: &JinjaEngine,
+        context: &serde_json::Value,
+    ) -> Result<String> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
-        Ok(buf)
+        let rendered = jinja.render(&buf, context)?;
+        Ok(rendered)
     }
 
     fn write(&self, content: &str, _args: &HashMap<String, String>) -> Result<()> {
@@ -31,7 +38,7 @@ impl IoHandler for StdioHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_args(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
+    fn try_parse_args(&self, tokens: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult {
         if tokens.front().map(String::as_str) != Some(KIND) {
             return TryParseResult::NotSupported;
         }
@@ -44,6 +51,6 @@ impl IoHandler for StdioHandler {
         let mut args = HashMap::new();
         args.insert("format".to_string(), format);
 
-        TryParseResult::Success(Stage::new(self.clone_box(), args))
+        TryParseResult::Success(Stage::new(self.clone_box(), args, jinja.clone()))
     }
 }

@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{Result, anyhow};
 
 use crate::handlers::format;
+use crate::jinja::JinjaEngine;
 use crate::workflow::io::{IoHandler, Stage, TryParseResult};
 
 const KIND: &str = "file";
@@ -15,11 +16,18 @@ const KIND: &str = "file";
 pub struct FileHandler;
 
 impl IoHandler for FileHandler {
-    fn read(&self, args: &HashMap<String, String>) -> Result<String> {
-        match args.get("path") {
-            Some(p) => Ok(fs::read_to_string(p)?),
-            None => Err(anyhow!("File handler: path is not specified")),
-        }
+    fn read(
+        &self,
+        args: &HashMap<String, String>,
+        jinja: &JinjaEngine,
+        context: &serde_json::Value,
+    ) -> Result<String> {
+        let path = args
+            .get("path")
+            .ok_or_else(|| anyhow!("File handler: path is not specified"))?;
+        let raw = fs::read_to_string(path)?;
+        let rendered = jinja.render(&raw, context)?;
+        Ok(rendered)
     }
 
     fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()> {
@@ -39,7 +47,7 @@ impl IoHandler for FileHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_args(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
+    fn try_parse_args(&self, tokens: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult {
         let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
             Some(KIND) => true,
             Some(maybe_path) => {
@@ -91,6 +99,6 @@ impl IoHandler for FileHandler {
         args.insert("path".to_string(), path);
         args.insert("format".to_string(), format_name);
 
-        TryParseResult::Success(Stage::new(self.clone_box(), args))
+        TryParseResult::Success(Stage::new(self.clone_box(), args, jinja.clone()))
     }
 }
