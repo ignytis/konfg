@@ -2,9 +2,13 @@ use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 
 use anyhow::{Result, anyhow};
+use serde_json::Value;
 
-use crate::jinja::JinjaEngine;
-use crate::workflow::io::{IoHandler, Stage, TryParseResult};
+use crate::{
+    handlers::format::get_handler_for_format,
+    jinja::JinjaEngine,
+    workflow::io::{IoHandler, Stage, TryParseResult},
+};
 
 const KIND: &str = "stdio";
 
@@ -15,14 +19,22 @@ pub struct StdioHandler;
 impl IoHandler for StdioHandler {
     fn read(
         &self,
-        _args: &HashMap<String, String>,
+        args: &HashMap<String, String>,
         jinja: &JinjaEngine,
         context: &serde_json::Value,
-    ) -> Result<String> {
+    ) -> Result<Value> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
         let rendered = jinja.render(&buf, context)?;
-        Ok(rendered)
+
+        match args.get("format") {
+            Some(f) => get_handler_for_format(f)
+                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
+                .parse(&rendered),
+            None => Err(anyhow!(
+                "Inputs/outputs without defined formats are not supported"
+            )),
+        }
     }
 
     fn write(&self, content: &str, _args: &HashMap<String, String>) -> Result<()> {

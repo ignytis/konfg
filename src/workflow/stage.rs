@@ -31,17 +31,8 @@ impl Stage {
 
     /// Reads content from this stage, renders it as Jinja template and parses it into Value.
     pub fn read(&self, context: &Value) -> Result<Value> {
-        let rendered = self
-            .io_handler
-            .read(&self.args, &self.jinja_engine, context)?;
-        match self.args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(&rendered),
-            None => Err(anyhow!(
-                "Inputs/outputs without defined formats are not supported"
-            )),
-        }
+        self.io_handler
+            .read(&self.args, &self.jinja_engine, context)
     }
 
     /// Writes serialized content to this stage.

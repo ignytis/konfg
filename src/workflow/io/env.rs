@@ -2,6 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::env;
 
 use anyhow::{Result, anyhow};
+use serde_json::{Map, Value};
 
 use crate::{
     jinja::JinjaEngine,
@@ -22,22 +23,22 @@ impl IoHandler for EnvHandler {
         args: &HashMap<String, String>,
         _jinja: &JinjaEngine,
         _context: &serde_json::Value,
-    ) -> Result<String> {
-        let mut res = String::new();
+    ) -> Result<Value> {
+        let mut res: Map<String, Value> = Map::new();
         let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
 
         for (key, value) in env::vars() {
             if prefix.is_empty() {
-                res.push_str(&format!("{}={}\n", key, value));
+                res.insert(key, Value::String(value));
             } else {
                 let prefix_with_sep = format!("{}__", prefix);
                 if key.starts_with(&prefix_with_sep) {
                     let stripped_key = &key[prefix_with_sep.len()..];
-                    res.push_str(&format!("{}={}\n", stripped_key, value));
+                    res.insert(String::from(stripped_key), Value::String(value));
                 }
             }
         }
-        Ok(res)
+        Ok(Value::Object(res.into()))
     }
 
     fn write(&self, _content: &str, _args: &HashMap<String, String>) -> Result<()> {
@@ -98,11 +99,17 @@ mod tests {
         let context = serde_json::Value::Object(Default::default());
 
         let content = handler.read(&args, &jinja, &context).unwrap();
-        let content_lines: Vec<&str> = content.trim().split("\n").collect();
+        let obj = content.as_object().unwrap();
 
-        assert!(content_lines.len() == 2);
-        assert!(content_lines.contains(&"DB__HOST=localhost"));
-        assert!(content_lines.contains(&"DB__PORT=5432"));
+        assert_eq!(obj.len(), 2);
+        assert_eq!(
+            obj.get("DB__HOST").and_then(|v| v.as_str()).unwrap(),
+            "localhost"
+        );
+        assert_eq!(
+            obj.get("DB__PORT").and_then(|v| v.as_str()).unwrap(),
+            "5432"
+        );
     }
 
     #[test]

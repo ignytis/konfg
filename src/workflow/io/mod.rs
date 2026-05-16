@@ -38,7 +38,7 @@ pub trait IoHandler: Send + Sync {
         args: &HashMap<String, String>,
         jinja: &JinjaEngine,
         context: &Value,
-    ) -> Result<String>;
+    ) -> Result<Value>;
 
     /// Writes serialized content to the destination.
     fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()>;

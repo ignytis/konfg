@@ -4,10 +4,13 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
+use serde_json::Value;
 
-use crate::handlers::format;
-use crate::jinja::JinjaEngine;
-use crate::workflow::io::{IoHandler, Stage, TryParseResult};
+use crate::{
+    handlers::format::{self, get_handler_for_format},
+    jinja::JinjaEngine,
+    workflow::io::{IoHandler, Stage, TryParseResult},
+};
 
 const KIND: &str = "file";
 
@@ -21,13 +24,21 @@ impl IoHandler for FileHandler {
         args: &HashMap<String, String>,
         jinja: &JinjaEngine,
         context: &serde_json::Value,
-    ) -> Result<String> {
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .ok_or_else(|| anyhow!("File handler: path is not specified"))?;
         let raw = fs::read_to_string(path)?;
         let rendered = jinja.render(&raw, context)?;
-        Ok(rendered)
+
+        match args.get("format") {
+            Some(f) => get_handler_for_format(f)
+                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
+                .parse(&rendered),
+            None => Err(anyhow!(
+                "Inputs/outputs without defined formats are not supported"
+            )),
+        }
     }
 
     fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()> {
