@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::{
     jinja::JinjaEngine,
     utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
-    workflow::{io::parse_tokens, stage::Stage},
+    workflow::stage::Stage,
 };
 
 /// Constants for command-line arguments.
@@ -18,28 +18,72 @@ pub const TOKEN_OUTPUT_LONG: &str = "--output";
 pub const TOKEN_PARAM_SHORT: &str = "-p";
 pub const TOKEN_PARAM_LONG: &str = "--param";
 
-/// Arguments parsed by 'do_parse_tokens' function
+/// Arguments parsed by 'do_parse_args' function
 struct ParsedArgs {
     inputs: Vec<VecDeque<String>>,
     output: Option<VecDeque<String>>,
     params: Vec<String>,
 }
 
+impl ParsedArgs {
+    // Argument parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
+    // arguments into argument lists until the next flag or end of input.
+    fn try_from_vec(args: Vec<String>) -> Result<ParsedArgs> {
+        let mut inputs: Vec<VecDeque<String>> = Vec::new();
+        let mut output: Option<VecDeque<String>> = None;
+        let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
+
+        let mut queue: VecDeque<String> = args.into_iter().collect();
+        while let Some(tok) = queue.pop_front() {
+            match tok.as_str() {
+                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
+                    let buf = parse_arg_buffer(&mut queue);
+                    inputs.push(buf);
+                }
+                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
+                    if output.is_some() {
+                        return Err(anyhow::anyhow!("Output is provided multiple times"));
+                    }
+                    let buf = parse_arg_buffer(&mut queue);
+                    output = Some(buf);
+                }
+                TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
+                    Some(p) => params.push(p),
+                    None => {
+                        return Err(anyhow::anyhow!(
+                            "No parameter is specified after -p or --param"
+                        ));
+                    }
+                },
+                other => {
+                    return Err(anyhow::anyhow!("Unexpected argument: {}", other));
+                }
+            }
+        }
+
+        Ok(ParsedArgs {
+            inputs,
+            output,
+            params,
+        })
+    }
+}
+
 /// Arguments for the build command.
 ///
-/// Positional tokens are used to describe inputs and output. Use `--in` to start an input spec
-/// and `--out` to start the output spec. All tokens after `--in` until the next `--in` or `--out`
+/// Positional arguments are used to describe inputs and output. Use `--in` to start an input spec
+/// and `--out` to start the output spec. All arguments after `--in` until the next `--in` or `--out`
 /// are considered part of that input. Example:
 ///   --in file /path yaml --in stdio json --out yaml
 #[derive(Args)]
 pub struct BuildArgs {
-    /// Positional tokens describing inputs and output.
+    /// Positional arguments describing inputs and output.
     #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true, allow_hyphen_values = true)]
-    pub tokens: Vec<String>,
+    pub args: Vec<String>,
 }
 
-pub fn build(args: BuildArgs) -> Result<()> {
-    let parsed_args = do_parse_tokens(args.tokens)?;
+pub fn build(build_args: BuildArgs) -> Result<()> {
+    let parsed_args = ParsedArgs::try_from_vec(build_args.args)?;
     if parsed_args.inputs.is_empty() {
         return Err(anyhow::anyhow!("No input is provided"));
     }
@@ -47,11 +91,11 @@ pub fn build(args: BuildArgs) -> Result<()> {
     let inputs: Vec<Stage> = parsed_args
         .inputs
         .into_iter()
-        .map(|tokens| parse_tokens(tokens))
+        .map(|args| Stage::try_from_strings(args))
         .collect::<Result<Vec<Stage>, _>>()?;
     let output: Stage = match parsed_args.output {
-        Some(tokens) if !tokens.is_empty() => parse_tokens(tokens)?,
-        _ => parse_tokens(VecDeque::from(vec![
+        Some(args) if !args.is_empty() => Stage::try_from_strings(args)?,
+        _ => Stage::try_from_strings(VecDeque::from(vec![
             "stdio".to_string(),
             "yaml".to_string(),
         ]))?,
@@ -75,48 +119,6 @@ pub fn build(args: BuildArgs) -> Result<()> {
 
     output.write(&merged)?;
     Ok(())
-}
-
-// Token parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
-// tokens into argument lists until the next flag or end of input.
-fn do_parse_tokens(tokens: Vec<String>) -> Result<ParsedArgs> {
-    let mut inputs: Vec<VecDeque<String>> = Vec::new();
-    let mut output: Option<VecDeque<String>> = None;
-    let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
-
-    let mut queue: VecDeque<String> = tokens.into_iter().collect();
-    while let Some(tok) = queue.pop_front() {
-        match tok.as_str() {
-            TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
-                let buf = parse_arg_buffer(&mut queue);
-                inputs.push(buf);
-            }
-            TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
-                if output.is_some() {
-                    return Err(anyhow::anyhow!("Output is provided multiple times"));
-                }
-                let buf = parse_arg_buffer(&mut queue);
-                output = Some(buf);
-            }
-            TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
-                Some(p) => params.push(p),
-                None => {
-                    return Err(anyhow::anyhow!(
-                        "No parameter is specified after -p or --param"
-                    ));
-                }
-            },
-            other => {
-                return Err(anyhow::anyhow!("Unexpected token: {}", other));
-            }
-        }
-    }
-
-    Ok(ParsedArgs {
-        inputs,
-        output,
-        params,
-    })
 }
 
 /// Consumes the buffer of all arguments by writing arguments from there

@@ -46,7 +46,7 @@ impl IoHandler for EnvHandler {
         Box::new(self.clone())
     }
 
-    fn try_parse_tokens(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
+    fn try_parse_args(&self, tokens: &mut VecDeque<String>) -> TryParseResult {
         if tokens.front().map(String::as_str) != Some(KIND) {
             return TryParseResult::NotSupported;
         }

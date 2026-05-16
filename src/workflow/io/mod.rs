@@ -7,11 +7,11 @@ use std::{
     sync::LazyLock,
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 use crate::workflow::stage::Stage;
 
-const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> = LazyLock::new(|| {
+pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn IoHandler>>> = LazyLock::new(|| {
     vec![
         Box::new(stdio::StdioHandler),
         Box::new(file::FileHandler),
@@ -43,28 +43,13 @@ pub trait IoHandler: Send + Sync {
     /// Clones the handler into a boxed trait object.
     fn clone_box(&self) -> Box<dyn IoHandler>;
 
-    /// Attempts to pop tokens from `tokens` and construct a `Stage`.
+    /// Attempts to pop args and construct a `Stage`.
     /// Returns `TryParseResult::NotSupported` if the first token is not supported by this handler.
-    fn try_parse_tokens(&self, tokens: &mut VecDeque<String>) -> TryParseResult;
+    fn try_parse_args(&self, args: &mut VecDeque<String>) -> TryParseResult;
 }
 
 impl Clone for Box<dyn IoHandler> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
-}
-
-/// Parses a flat list of tokens into a `Stage` using registered handlers.
-/// `tokens` is a VecDeque of string parameters for single input / output.
-/// Example: ['file', '/path/to/file.cfg', 'yaml']
-pub fn parse_tokens(mut tokens: VecDeque<String>) -> Result<Stage> {
-    for io_handler in REGISTERED_HANDLERS.iter() {
-        match io_handler.try_parse_tokens(&mut tokens) {
-            TryParseResult::Success(s) => return Ok(s),
-            TryParseResult::NotSupported => continue,
-            TryParseResult::Error(e) => return Err(e),
-        }
-    }
-
-    return Err(anyhow!("Unrecognized input token: {:?}", tokens));
 }
