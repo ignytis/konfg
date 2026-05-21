@@ -35,30 +35,61 @@ pub fn hashmap_new_from_kv_params(params: &[String]) -> Result<serde_json::Map<S
         let (key, val) = p
             .split_once('=')
             .ok_or_else(|| anyhow::anyhow!("Invalid param '{p}': expected key=value"))?;
-        map = hashmap_insert_value_dot_separator(map, key, Value::String(val.to_string()));
+        let parts = hashmap_parse_key_parts(key);
+        map = hashmap_insert_nested_value(map, &parts, Value::String(val.to_string()));
     }
     Ok(map)
 }
 
-/// Inserts a `value` into `map` using `key`.
-/// Considers the nested structure, spltting key by dots.
-fn hashmap_insert_value_dot_separator(
+/// Parses a key into parts, considering dots as separators and double dots as escaped dots.
+pub fn hashmap_parse_key_parts(key: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut chars = key.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '.' {
+            if chars.peek() == Some(&'.') {
+                // Escaped dot: ".." -> "."
+                chars.next();
+                current.push('.');
+            } else {
+                // Separator: "."
+                parts.push(std::mem::take(&mut current));
+            }
+        } else {
+            current.push(c);
+        }
+    }
+    parts.push(current);
+    parts
+}
+
+/// Inserts a `value` into `map` using `parts` as a path.
+pub fn hashmap_insert_nested_value(
     mut map: serde_json::Map<String, Value>,
-    key: &str,
+    parts: &[String],
     val: Value,
 ) -> serde_json::Map<String, Value> {
-    if let Some((head, tail)) = key.split_once('.') {
-        let inner = match map.remove(head) {
-            Some(Value::Object(inner_map)) => inner_map,
-            _ => serde_json::Map::new(),
-        };
-        map.insert(
-            head.to_string(),
-            Value::Object(hashmap_insert_value_dot_separator(inner, tail, val)),
-        );
-    } else {
-        map.insert(key.to_string(), val);
+    if parts.is_empty() {
+        return map;
     }
+    if parts.len() == 1 {
+        map.insert(parts[0].clone(), val);
+        return map;
+    }
+
+    let head = &parts[0];
+    let tail = &parts[1..];
+
+    let inner = match map.remove(head) {
+        Some(Value::Object(inner_map)) => inner_map,
+        _ => serde_json::Map::new(),
+    };
+    map.insert(
+        head.clone(),
+        Value::Object(hashmap_insert_nested_value(inner, tail, val)),
+    );
     map
 }
 
@@ -194,6 +225,31 @@ mod tests {
                 },
                 "x": {
                     "y": "val3"
+                }
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hashmap_parse_key_parts() {
+        assert_eq!(hashmap_parse_key_parts("a.b.c"), vec!["a", "b", "c"]);
+        assert_eq!(hashmap_parse_key_parts("a..b.c"), vec!["a.b", "c"]);
+        assert_eq!(hashmap_parse_key_parts("a....b"), vec!["a..b"]);
+        assert_eq!(hashmap_parse_key_parts("a...b"), vec!["a.", "b"]);
+    }
+
+    #[test]
+    fn test_hashmap_new_from_kv_params_escaped() -> Result<()> {
+        let params = vec!["a..b.c=val1".to_string()];
+
+        let result = hashmap_new_from_kv_params(&params)?;
+        assert_eq!(
+            json!(result),
+            json!({
+                "a.b": {
+                    "c": "val1"
                 }
             })
         );

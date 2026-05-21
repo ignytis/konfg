@@ -5,6 +5,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     jinja::JinjaEngine,
+    utils::hashmap::{hashmap_insert_nested_value, hashmap_parse_key_parts},
     workflow::io::{IoHandler, Stage, TryParseResult},
 };
 
@@ -28,10 +29,7 @@ impl IoHandler for ParamHandler {
             .get("value")
             .ok_or_else(|| anyhow!("Param handler: value is not specified"))?;
 
-        let mut res = Map::new();
-        res.insert(key.clone(), Value::String(value.clone()));
-
-        Ok(Value::Object(res))
+        Ok(self.parse_nested_param(key, value))
     }
 
     fn write(&self, _content: &str, _args: &HashMap<String, String>) -> Result<()> {
@@ -70,12 +68,23 @@ impl IoHandler for ParamHandler {
     }
 }
 
+impl ParamHandler {
+    /// Parses a key-value pair into a nested `Value` structure.
+    /// Dots in the key are treated as level separators, unless they are escaped (doubled).
+    fn parse_nested_param(&self, key: &str, value: &str) -> Value {
+        let parts = hashmap_parse_key_parts(key);
+        let map = hashmap_insert_nested_value(Map::new(), &parts, Value::String(value.to_string()));
+        Value::Object(map)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
-    fn test_param_read() {
+    fn test_param_read_simple() {
         let handler = ParamHandler;
         let mut args = HashMap::new();
         args.insert("key".to_string(), "my_key".to_string());
@@ -85,12 +94,99 @@ mod tests {
         let context = Value::Object(Default::default());
 
         let content = handler.read(&args, &jinja, &context).unwrap();
-        let obj = content.as_object().unwrap();
+        assert_eq!(content, json!({"my_key": "my_value"}));
+    }
 
-        assert_eq!(obj.len(), 1);
+    #[test]
+    fn test_param_read_nested() {
+        let handler = ParamHandler;
+        let mut args = HashMap::new();
+        args.insert("key".to_string(), "a.b.c".to_string());
+        args.insert("value".to_string(), "val".to_string());
+
+        let jinja = JinjaEngine::new();
+        let context = Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
-            obj.get("my_key").and_then(|v| v.as_str()).unwrap(),
-            "my_value"
+            content,
+            json!({
+                "a": {
+                    "b": {
+                        "c": "val"
+                    }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_param_read_escaped() {
+        let handler = ParamHandler;
+        let mut args = HashMap::new();
+        args.insert("key".to_string(), "a..b.c".to_string());
+        args.insert("value".to_string(), "val".to_string());
+
+        let jinja = JinjaEngine::new();
+        let context = Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
+        assert_eq!(
+            content,
+            json!({
+                "a.b": {
+                    "c": "val"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_param_read_multiple_escaped() {
+        let handler = ParamHandler;
+        let mut args = HashMap::new();
+        args.insert("key".to_string(), "a....b".to_string());
+        args.insert("value".to_string(), "val".to_string());
+
+        let jinja = JinjaEngine::new();
+        let context = Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
+        assert_eq!(content, json!({"a..b": "val"}));
+    }
+
+    #[test]
+    fn test_param_read_escaped_at_end() {
+        let handler = ParamHandler;
+        let mut args = HashMap::new();
+        args.insert("key".to_string(), "a..".to_string());
+        args.insert("value".to_string(), "val".to_string());
+
+        let jinja = JinjaEngine::new();
+        let context = Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
+        assert_eq!(content, json!({"a.": "val"}));
+    }
+
+    #[test]
+    fn test_param_read_triple_dot() {
+        let handler = ParamHandler;
+        let mut args = HashMap::new();
+        args.insert("key".to_string(), "a...b".to_string());
+        args.insert("value".to_string(), "val".to_string());
+
+        let jinja = JinjaEngine::new();
+        let context = Value::Object(Default::default());
+
+        let content = handler.read(&args, &jinja, &context).unwrap();
+        assert_eq!(
+            content,
+            json!({
+                "a.": {
+                    "b": "val"
+                }
+            })
         );
     }
 
