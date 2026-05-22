@@ -93,13 +93,14 @@ pub fn build(build_args: BuildArgs) -> Result<()> {
     let input_stages: Vec<Stage> = parsed_args
         .inputs
         .into_iter()
-        .map(|args| Stage::try_from_strings(args, jinja.clone()))
+        .map(|args| Stage::try_from_strings(args, jinja.clone(), false))
         .collect::<Result<Vec<Stage>, _>>()?;
     let output: Stage = match parsed_args.output {
-        Some(args) if !args.is_empty() => Stage::try_from_strings(args, jinja.clone())?,
+        Some(args) if !args.is_empty() => Stage::try_from_strings(args, jinja.clone(), true)?,
         _ => Stage::try_from_strings(
             VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]),
             jinja.clone(),
+            true,
         )?,
     };
     let params = hashmap_new_from_kv_params(&parsed_args.params)?;
@@ -108,7 +109,7 @@ pub fn build(build_args: BuildArgs) -> Result<()> {
     let mut merged: Value = Value::Object(Default::default());
 
     for input_stage in &input_stages {
-        let value = input_stage.read(&jinja_ctx)?;
+        let value = input_stage.run(&jinja_ctx)?;
 
         cfg_values_deep_merge(&mut merged, value.clone())?;
         // Update context. Values from the previous iterations could be re-used
@@ -116,7 +117,7 @@ pub fn build(build_args: BuildArgs) -> Result<()> {
         cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
     }
 
-    output.write(&merged)?;
+    output.run(&merged)?;
     Ok(())
 }
 

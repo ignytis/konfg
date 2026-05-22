@@ -1,12 +1,13 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use serde_json::{Map, Value};
 
 use crate::{
     jinja::JinjaEngine,
-    workflow::io::{IoHandler, Stage, TryParseResult},
+    workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
+    workflow::stage::{Stage, StageKind},
 };
 
 const KIND: &str = "env";
@@ -17,7 +18,50 @@ const KIND: &str = "env";
 #[derive(Clone)]
 pub struct EnvHandler;
 
-impl IoHandler for EnvHandler {
+impl BaseIoHandler for EnvHandler {
+    fn supports(&self, kind: &str) -> bool {
+        kind == KIND
+    }
+
+    fn clone_box(&self) -> Box<dyn BaseIoHandler> {
+        Box::new(self.clone())
+    }
+
+    fn try_parse_args(
+        &self,
+        tokens: &mut VecDeque<String>,
+        jinja: &JinjaEngine,
+        is_output: bool,
+    ) -> TryParseResult {
+        if tokens.front().map(String::as_str) != Some(KIND) {
+            return TryParseResult::NotSupported;
+        }
+
+        if is_output {
+            return TryParseResult::Error(anyhow::anyhow!(
+                "Environment handler: writing to environment variables is not supported"
+            ));
+        }
+
+        tokens.pop_front();
+
+        let prefix = tokens.pop_front();
+
+        let mut args = HashMap::new();
+        if let Some(p) = prefix {
+            args.insert("prefix".to_string(), p);
+        }
+        args.insert("format".to_string(), "dotenv".to_string());
+
+        TryParseResult::Success(Stage::new(
+            StageKind::Input(Box::new(self.clone())),
+            args,
+            jinja.clone(),
+        ))
+    }
+}
+
+impl InputHandler for EnvHandler {
     fn read(
         &self,
         args: &HashMap<String, String>,
@@ -39,37 +83,6 @@ impl IoHandler for EnvHandler {
             }
         }
         Ok(Value::Object(res.into()))
-    }
-
-    fn write(&self, _content: &str, _args: &HashMap<String, String>) -> Result<()> {
-        Err(anyhow!(
-            "Environment handler: writing to environment variables is not supported"
-        ))
-    }
-
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn IoHandler> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(&self, tokens: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult {
-        if tokens.front().map(String::as_str) != Some(KIND) {
-            return TryParseResult::NotSupported;
-        }
-        tokens.pop_front();
-
-        let prefix = tokens.pop_front();
-
-        let mut args = HashMap::new();
-        if let Some(p) = prefix {
-            args.insert("prefix".to_string(), p);
-        }
-        args.insert("format".to_string(), "dotenv".to_string());
-
-        TryParseResult::Success(Stage::new(self.clone_box(), args, jinja.clone()))
     }
 }
 
@@ -113,14 +126,18 @@ mod tests {
     }
 
     #[test]
-    fn test_env_write_error() {
+    fn test_env_try_parse_args_output_error() {
         let handler = EnvHandler;
-        let result = handler.write("content", &HashMap::new());
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Environment handler: writing to environment variables is not supported"
-        );
+        let mut tokens = VecDeque::from(vec!["env".to_string()]);
+        let jinja = JinjaEngine::new();
+        let result = handler.try_parse_args(&mut tokens, &jinja, true);
+        assert!(matches!(result, TryParseResult::Error(_)));
+        if let TryParseResult::Error(e) = result {
+            assert_eq!(
+                e.to_string(),
+                "Environment handler: writing to environment variables is not supported"
+            );
+        }
     }
 
     #[test]

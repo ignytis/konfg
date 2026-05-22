@@ -6,7 +6,8 @@ use serde_json::{Map, Value};
 use crate::{
     jinja::JinjaEngine,
     utils::hashmap::{hashmap_insert_nested_value, hashmap_parse_key_parts},
-    workflow::io::{IoHandler, Stage, TryParseResult},
+    workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
+    workflow::stage::{Stage, StageKind},
 };
 
 const KIND: &str = "param";
@@ -15,39 +16,29 @@ const KIND: &str = "param";
 #[derive(Clone)]
 pub struct ParamHandler;
 
-impl IoHandler for ParamHandler {
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        _jinja: &JinjaEngine,
-        _context: &serde_json::Value,
-    ) -> Result<Value> {
-        let key = args
-            .get("key")
-            .ok_or_else(|| anyhow!("Param handler: key is not specified"))?;
-        let value = args
-            .get("value")
-            .ok_or_else(|| anyhow!("Param handler: value is not specified"))?;
-
-        Ok(self.parse_nested_param(key, value))
-    }
-
-    fn write(&self, _content: &str, _args: &HashMap<String, String>) -> Result<()> {
-        Err(anyhow!("Param handler: writing to params is not supported"))
-    }
-
+impl BaseIoHandler for ParamHandler {
     fn supports(&self, kind: &str) -> bool {
         kind == KIND
     }
 
-    fn clone_box(&self) -> Box<dyn IoHandler> {
+    fn clone_box(&self) -> Box<dyn BaseIoHandler> {
         Box::new(self.clone())
     }
 
-    fn try_parse_args(&self, tokens: &mut VecDeque<String>, jinja: &JinjaEngine) -> TryParseResult {
+    fn try_parse_args(
+        &self,
+        tokens: &mut VecDeque<String>,
+        jinja: &JinjaEngine,
+        is_output: bool,
+    ) -> TryParseResult {
         if tokens.front().map(String::as_str) != Some(KIND) {
             return TryParseResult::NotSupported;
         }
+
+        if is_output {
+            return TryParseResult::Error(anyhow!("param: writing to params is not supported"));
+        }
+
         tokens.pop_front();
 
         let key = match tokens.pop_front() {
@@ -64,7 +55,29 @@ impl IoHandler for ParamHandler {
         args.insert("key".to_string(), key);
         args.insert("value".to_string(), value);
 
-        TryParseResult::Success(Stage::new(self.clone_box(), args, jinja.clone()))
+        TryParseResult::Success(Stage::new(
+            StageKind::Input(Box::new(self.clone())),
+            args,
+            jinja.clone(),
+        ))
+    }
+}
+
+impl InputHandler for ParamHandler {
+    fn read(
+        &self,
+        args: &HashMap<String, String>,
+        _jinja: &JinjaEngine,
+        _context: &serde_json::Value,
+    ) -> Result<Value> {
+        let key = args
+            .get("key")
+            .ok_or_else(|| anyhow!("Param handler: key is not specified"))?;
+        let value = args
+            .get("value")
+            .ok_or_else(|| anyhow!("Param handler: value is not specified"))?;
+
+        Ok(self.parse_nested_param(key, value))
     }
 }
 
@@ -191,14 +204,19 @@ mod tests {
     }
 
     #[test]
-    fn test_param_write_error() {
+    fn test_param_try_parse_args_output_error() {
         let handler = ParamHandler;
-        let result = handler.write("content", &HashMap::new());
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Param handler: writing to params is not supported"
-        );
+        let mut tokens = VecDeque::from(vec![
+            "param".to_string(),
+            "key".to_string(),
+            "value".to_string(),
+        ]);
+        let jinja = JinjaEngine::new();
+        let result = handler.try_parse_args(&mut tokens, &jinja, true);
+        assert!(matches!(result, TryParseResult::Error(_)));
+        if let TryParseResult::Error(e) = result {
+            assert_eq!(e.to_string(), "param: writing to params is not supported");
+        }
     }
 
     #[test]
@@ -218,7 +236,7 @@ mod tests {
         ]);
         let jinja = JinjaEngine::new();
 
-        let result = handler.try_parse_args(&mut tokens, &jinja);
+        let result = handler.try_parse_args(&mut tokens, &jinja, false);
         if let TryParseResult::Success(stage) = result {
             assert_eq!(stage.args.get("key").unwrap(), "foo");
             assert_eq!(stage.args.get("value").unwrap(), "bar");
@@ -234,7 +252,7 @@ mod tests {
         let mut tokens = VecDeque::from(vec!["param".to_string(), "foo".to_string()]);
         let jinja = JinjaEngine::new();
 
-        let result = handler.try_parse_args(&mut tokens, &jinja);
+        let result = handler.try_parse_args(&mut tokens, &jinja, false);
         if let TryParseResult::Error(e) = result {
             assert_eq!(e.to_string(), "param: missing value");
         } else {

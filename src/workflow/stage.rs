@@ -6,52 +6,57 @@ use serde_json::Value;
 use crate::{
     handlers::format::get_handler_for_format,
     jinja::JinjaEngine,
-    workflow::io::{IoHandler, REGISTERED_HANDLERS, TryParseResult},
+    workflow::io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult},
 };
+
+pub enum StageKind {
+    Input(Box<dyn InputHandler>),
+    Output(Box<dyn OutputHandler>),
+}
 
 /// Represents a configuration source or destination with associated IO and format handlers.
 pub struct Stage {
-    pub io_handler: Box<dyn IoHandler>,
+    pub kind: StageKind,
     pub args: HashMap<String, String>,
     pub jinja_engine: JinjaEngine,
 }
 
 impl Stage {
-    pub fn new(
-        io_handler: Box<dyn IoHandler>,
-        args: HashMap<String, String>,
-        jinja_engine: JinjaEngine,
-    ) -> Self {
+    pub fn new(kind: StageKind, args: HashMap<String, String>, jinja_engine: JinjaEngine) -> Self {
         Self {
-            io_handler,
+            kind,
             args,
             jinja_engine,
         }
     }
 
-    /// Reads content from this stage, renders it as Jinja template and parses it into Value.
-    pub fn read(&self, context: &Value) -> Result<Value> {
-        self.io_handler
-            .read(&self.args, &self.jinja_engine, context)
-    }
-
-    /// Writes serialized content to this stage.
-    pub fn write(&self, value: &Value) -> Result<()> {
-        let serialized_value = match self.args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .serialize(value)?,
-            None => value.to_string(),
-        };
-        self.io_handler.write(&serialized_value, &self.args)
+    /// Executes the stage: reads content for input stages, or writes content for output stages.
+    pub fn run(&self, value: &Value) -> Result<Value> {
+        match &self.kind {
+            StageKind::Input(handler) => handler.read(&self.args, &self.jinja_engine, value),
+            StageKind::Output(handler) => {
+                let serialized_value = match self.args.get("format") {
+                    Some(f) => get_handler_for_format(f)
+                        .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
+                        .serialize(value)?,
+                    None => value.to_string(),
+                };
+                handler.write(&serialized_value, &self.args)?;
+                Ok(Value::Null)
+            }
+        }
     }
 
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single input / output.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings(mut tokens: VecDeque<String>, jinja: JinjaEngine) -> Result<Stage> {
+    pub fn try_from_strings(
+        mut tokens: VecDeque<String>,
+        jinja: JinjaEngine,
+        is_output: bool,
+    ) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
-            match io_handler.try_parse_args(&mut tokens, &jinja) {
+            match io_handler.try_parse_args(&mut tokens, &jinja, is_output) {
                 TryParseResult::Success(s) => return Ok(s),
                 TryParseResult::NotSupported => continue,
                 TryParseResult::Error(e) => return Err(e),
