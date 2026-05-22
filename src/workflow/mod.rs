@@ -22,10 +22,9 @@ const TOKEN_PARAM_LONG: &str = "--param";
 
 /// Represents a configuration building workflow.
 pub struct Workflow {
-    /// List of input stages to be merged sequentially.
+    /// List of stages to be executed sequentially.
+    /// The last stage is always the output stage.
     pub stages: LinkedList<Stage>,
-    /// The final output stage.
-    pub output: Stage,
     /// Parameters used for Jinja2 templating.
     pub params: Vec<String>,
 }
@@ -82,12 +81,9 @@ impl Workflow {
                 true,
             )?,
         };
+        stages.push_back(output);
 
-        Ok(Workflow {
-            stages,
-            output,
-            params,
-        })
+        Ok(Workflow { stages, params })
     }
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
@@ -96,16 +92,22 @@ impl Workflow {
         let mut jinja_ctx: Value = params_map.into();
         let mut merged: Value = Value::Object(Default::default());
 
-        for stage in &self.stages {
-            let value = stage.run(&jinja_ctx)?;
+        let mut iter = self.stages.iter().peekable();
+        while let Some(stage) = iter.next() {
+            if iter.peek().is_none() {
+                // Last stage (output)
+                stage.run(&merged)?;
+            } else {
+                // Input stage
+                let value = stage.run(&jinja_ctx)?;
 
-            cfg_values_deep_merge(&mut merged, value.clone())?;
-            // Update context. Values from the previous iterations could be re-used
-            // in the next iterations
-            cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
+                cfg_values_deep_merge(&mut merged, value.clone())?;
+                // Update context. Values from the previous iterations could be re-used
+                // in the next iterations
+                cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
+            }
         }
 
-        self.output.run(&merged)?;
         Ok(())
     }
 }
