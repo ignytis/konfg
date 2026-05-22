@@ -30,6 +30,16 @@ impl Stage {
         }
     }
 
+    /// Returns true if the stage is an input stage.
+    pub fn is_input(&self) -> bool {
+        matches!(self.kind, StageKind::Input(_))
+    }
+
+    /// Returns true if the stage is an output stage.
+    pub fn is_output(&self) -> bool {
+        matches!(self.kind, StageKind::Output(_))
+    }
+
     /// Executes the stage: reads content for input stages, or writes content for output stages.
     pub fn run(&self, value: &Value) -> Result<Value> {
         match &self.kind {

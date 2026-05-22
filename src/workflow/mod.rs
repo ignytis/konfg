@@ -32,23 +32,21 @@ pub struct Workflow {
 impl Workflow {
     /// Builds a workflow from a list of command-line arguments.
     pub fn try_from_args(args: Vec<String>) -> Result<Self> {
-        let mut input_args_list: Vec<VecDeque<String>> = Vec::new();
-        let mut output_args: Option<VecDeque<String>> = None;
+        let mut stages = LinkedList::new();
         let mut params: Vec<String> = Vec::new();
+
+        let jinja = JinjaEngine::new();
 
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
             match tok.as_str() {
                 TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
                     let buf = parse_arg_buffer(&mut queue);
-                    input_args_list.push(buf);
+                    stages.push_back(Stage::try_from_strings(buf, &jinja, false)?);
                 }
                 TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
-                    if output_args.is_some() {
-                        return Err(anyhow!("Output is provided multiple times"));
-                    }
                     let buf = parse_arg_buffer(&mut queue);
-                    output_args = Some(buf);
+                    stages.push_back(Stage::try_from_strings(buf, &jinja, true)?);
                 }
                 TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
                     Some(p) => params.push(p),
@@ -62,26 +60,22 @@ impl Workflow {
             }
         }
 
-        if input_args_list.is_empty() {
-            return Err(anyhow!("No input is provided"));
+        // Validation: The first stage must be an input stage
+        match stages.front() {
+            Some(first) if first.is_input() => (),
+            Some(_) => return Err(anyhow!("The first stage must be an input stage")),
+            None => return Err(anyhow!("No input stages provided")),
         }
 
-        let jinja = JinjaEngine::new();
-
-        let mut stages = LinkedList::new();
-        for args in input_args_list {
-            stages.push_back(Stage::try_from_strings(args, &jinja, false)?);
-        }
-
-        let output = match output_args {
-            Some(args) if !args.is_empty() => Stage::try_from_strings(args, &jinja, true)?,
-            _ => Stage::try_from_strings(
+        // Validation: The last stage must be an output stage. If not, add default.
+        let last_is_output = stages.back().map_or(false, |last| last.is_output());
+        if !last_is_output {
+            stages.push_back(Stage::try_from_strings(
                 VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]),
                 &jinja,
                 true,
-            )?,
-        };
-        stages.push_back(output);
+            )?);
+        }
 
         Ok(Workflow { stages, params })
     }
