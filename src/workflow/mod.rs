@@ -70,14 +70,14 @@ impl Workflow {
 
         let mut stages = LinkedList::new();
         for args in input_args_list {
-            stages.push_back(Stage::try_from_strings(args, jinja.clone(), false)?);
+            stages.push_back(Stage::try_from_strings(args, &jinja, false)?);
         }
 
         let output = match output_args {
-            Some(args) if !args.is_empty() => Stage::try_from_strings(args, jinja.clone(), true)?,
+            Some(args) if !args.is_empty() => Stage::try_from_strings(args, &jinja, true)?,
             _ => Stage::try_from_strings(
                 VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]),
-                jinja.clone(),
+                &jinja,
                 true,
             )?,
         };

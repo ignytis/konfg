@@ -52,7 +52,7 @@ impl Stage {
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
     pub fn try_from_strings(
         mut tokens: VecDeque<String>,
-        jinja: JinjaEngine,
+        jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
