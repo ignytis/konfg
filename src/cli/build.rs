@@ -1,22 +1,7 @@
-use std::collections::VecDeque;
-
 use anyhow::Result;
 use clap::Args;
-use serde_json::Value;
 
-use crate::{
-    jinja::JinjaEngine,
-    utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
-    workflow::stage::Stage,
-};
-
-/// Constants for command-line arguments.
-pub const TOKEN_INPUT_SHORT: &str = "-i";
-pub const TOKEN_INPUT_LONG: &str = "--input";
-pub const TOKEN_OUTPUT_SHORT: &str = "-o";
-pub const TOKEN_OUTPUT_LONG: &str = "--output";
-pub const TOKEN_PARAM_SHORT: &str = "-p";
-pub const TOKEN_PARAM_LONG: &str = "--param";
+use crate::workflow::Workflow;
 
 /// Raw arguments for the build command.
 ///
@@ -31,113 +16,8 @@ pub struct BuildArgs {
     pub args: Vec<String>,
 }
 
-/// Arguments parsed by 'do_parse_args' function
-struct ParsedArgs {
-    inputs: Vec<VecDeque<String>>,
-    output: Option<VecDeque<String>>,
-    params: Vec<String>,
-}
-
-impl ParsedArgs {
-    // Argument parsing: pop flags (-i/--input, -o/--output, -p/--param) and collect following
-    // arguments into argument lists until the next flag or end of input.
-    fn try_from_vec(args: Vec<String>) -> Result<ParsedArgs> {
-        let mut inputs: Vec<VecDeque<String>> = Vec::new();
-        let mut output: Option<VecDeque<String>> = None;
-        let mut params: Vec<String> = Vec::new(); // each param is a 'key=value' string
-
-        let mut queue: VecDeque<String> = args.into_iter().collect();
-        while let Some(tok) = queue.pop_front() {
-            match tok.as_str() {
-                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
-                    let buf = parse_arg_buffer(&mut queue);
-                    inputs.push(buf);
-                }
-                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
-                    if output.is_some() {
-                        return Err(anyhow::anyhow!("Output is provided multiple times"));
-                    }
-                    let buf = parse_arg_buffer(&mut queue);
-                    output = Some(buf);
-                }
-                TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
-                    Some(p) => params.push(p),
-                    None => {
-                        return Err(anyhow::anyhow!(
-                            "No parameter is specified after -p or --param"
-                        ));
-                    }
-                },
-                other => {
-                    return Err(anyhow::anyhow!("Unexpected argument: {}", other));
-                }
-            }
-        }
-
-        Ok(ParsedArgs {
-            inputs,
-            output,
-            params,
-        })
-    }
-}
-
 pub fn build(build_args: BuildArgs) -> Result<()> {
-    let parsed_args = ParsedArgs::try_from_vec(build_args.args)?;
-    if parsed_args.inputs.is_empty() {
-        return Err(anyhow::anyhow!("No input is provided"));
-    }
-
-    let jinja = JinjaEngine::new();
-
-    let input_stages: Vec<Stage> = parsed_args
-        .inputs
-        .into_iter()
-        .map(|args| Stage::try_from_strings(args, jinja.clone(), false))
-        .collect::<Result<Vec<Stage>, _>>()?;
-    let output: Stage = match parsed_args.output {
-        Some(args) if !args.is_empty() => Stage::try_from_strings(args, jinja.clone(), true)?,
-        _ => Stage::try_from_strings(
-            VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]),
-            jinja.clone(),
-            true,
-        )?,
-    };
-    let params = hashmap_new_from_kv_params(&parsed_args.params)?;
-
-    let mut jinja_ctx: Value = params.into();
-    let mut merged: Value = Value::Object(Default::default());
-
-    for input_stage in &input_stages {
-        let value = input_stage.run(&jinja_ctx)?;
-
-        cfg_values_deep_merge(&mut merged, value.clone())?;
-        // Update context. Values from the previous iterations could be re-used
-        // in the next iterations
-        cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
-    }
-
-    output.run(&merged)?;
+    let workflow = Workflow::try_from_args(build_args.args)?;
+    workflow.execute()?;
     Ok(())
-}
-
-/// Consumes the buffer of all arguments by writing arguments from there
-/// into buffer for current stage until end of stage data is reached.
-/// Returns a buffer with arguments for current stage.
-fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
-    let mut buf: VecDeque<String> = VecDeque::new();
-    while let Some(next) = buf_all.front() {
-        if next == TOKEN_INPUT_SHORT
-            || next == TOKEN_INPUT_LONG
-            || next == TOKEN_OUTPUT_SHORT
-            || next == TOKEN_OUTPUT_LONG
-            || next == TOKEN_PARAM_SHORT
-            || next == TOKEN_PARAM_LONG
-        {
-            break;
-        }
-        buf.push_back(buf_all.pop_front().unwrap());
-    }
-
-    buf
 }
