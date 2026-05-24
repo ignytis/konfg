@@ -13,8 +13,6 @@ const TOKEN_INPUT_SHORT: &str = "-i";
 const TOKEN_INPUT_LONG: &str = "--input";
 const TOKEN_OUTPUT_SHORT: &str = "-o";
 const TOKEN_OUTPUT_LONG: &str = "--output";
-const TOKEN_PARAM_SHORT: &str = "-p";
-const TOKEN_PARAM_LONG: &str = "--param";
 
 /// Represents a configuration building workflow.
 pub struct Workflow {
@@ -69,20 +67,10 @@ impl Workflow {
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
     pub fn execute(&self) -> Result<()> {
         let mut merged: Value = Value::Object(Default::default());
-
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
-            if iter.peek().is_none() {
-                // Last stage (output)
-                stage.run(&merged)?;
-            } else {
-                // Input stage
-                let value = stage.run(&merged)?;
-
-                // Update context. Values from the previous iterations could be re-used
-                // in the next iterations
-                cfg_values_deep_merge(&mut merged, value.clone())?;
-            }
+            let value = stage.run(&merged)?;
+            cfg_values_deep_merge(&mut merged, value.clone())?;
         }
 
         Ok(())
@@ -99,8 +87,6 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
             || next == TOKEN_INPUT_LONG
             || next == TOKEN_OUTPUT_SHORT
             || next == TOKEN_OUTPUT_LONG
-            || next == TOKEN_PARAM_SHORT
-            || next == TOKEN_PARAM_LONG
         {
             break;
         }
