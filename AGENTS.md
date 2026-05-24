@@ -19,10 +19,10 @@ The project is structured into modular components:
 - **`src/main.rs`:** Entry point, orchestrates the command execution.
 - **`src/cli/`:** CLI parsing (via `clap`) and command implementations (e.g., `build`).
 - **`src/handlers/format/`:** Implementations for parsing and serializing different configuration formats.
-- **`src/workflow/io/`:** Handles reading from and writing to different targets (files, stdin/stdout).
+- **`src/workflow/io/`:** Handles reading from and writing to different targets (files, env, param, stdio).
 - **`src/workflow/`:** Workflow logic and the `Stage` structure.
 - **`src/utils/`:** Utility functions for deep merging (`cfg_values`) and parameter handling (`hashmap`).
-- **`src/jinja.rs`:** Jinja2 template rendering logic.
+- **`src/jinja/`:** Jinja2 template rendering logic.
 
 ## Code style
 
@@ -45,14 +45,13 @@ The project is structured into modular components:
 Example:
 ```rust
 use crate::{
-    format_handlers::{self, FormatHandler},
-    io::{self, IoHandler},
+    handlers::format::{self, FormatHandler},
+    workflow::io::{self, IoHandler},
     types::format::Format,
-    utils::uri::Uri
 };
 ```
 
-## Post-edit acctions
+## Post-edit actions
 
 At the end of plan execution:
 1. Format the code using `cargo fmt`
@@ -68,13 +67,13 @@ At the end of plan execution:
 ### Key Commands
 
 - **Build:** `cargo build`
-- **Run:** `cargo run -- <templates> [options]`
+- **Run:** `cargo run -- build -i <inputs> [options]`
 - **Test:** `cargo test`
 
 ### Example Usage
 
 ```bash
-cargo run -- template1.yaml template2.toml -p my.param=value -o stdio-json://
+cargo run -- build -i template1.yaml -i template2.toml -i param my.param value -o stdio json
 ```
 
 ## Development Conventions

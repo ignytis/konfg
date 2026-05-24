@@ -6,11 +6,7 @@ use std::collections::{LinkedList, VecDeque};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
-use crate::{
-    jinja::JinjaEngine,
-    utils::{cfg_values::cfg_values_deep_merge, hashmap::hashmap_new_from_kv_params},
-    workflow::stage::Stage,
-};
+use crate::{jinja::JinjaEngine, utils::cfg_values::cfg_values_deep_merge, workflow::stage::Stage};
 
 /// Constants for command-line arguments.
 const TOKEN_INPUT_SHORT: &str = "-i";
@@ -25,18 +21,14 @@ pub struct Workflow {
     /// List of stages to be executed sequentially.
     /// The last stage is always the output stage.
     pub stages: LinkedList<Stage>,
-    /// Parameters used for Jinja2 templating.
-    pub params: Vec<String>,
 }
 
 impl Workflow {
     /// Builds a workflow from a list of command-line arguments.
     pub fn try_from_args(args: Vec<String>) -> Result<Self> {
-        let mut stages = LinkedList::new();
-        let mut params: Vec<String> = Vec::new();
-
         let jinja = JinjaEngine::new();
 
+        let mut stages = LinkedList::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
             match tok.as_str() {
@@ -48,12 +40,6 @@ impl Workflow {
                     let buf = parse_arg_buffer(&mut queue);
                     stages.push_back(Stage::try_from_strings(buf, &jinja, true)?);
                 }
-                TOKEN_PARAM_SHORT | TOKEN_PARAM_LONG => match queue.pop_front() {
-                    Some(p) => params.push(p),
-                    None => {
-                        return Err(anyhow!("No parameter is specified after -p or --param"));
-                    }
-                },
                 other => {
                     return Err(anyhow!("Unexpected argument: {}", other));
                 }
@@ -77,13 +63,11 @@ impl Workflow {
             )?);
         }
 
-        Ok(Workflow { stages, params })
+        Ok(Workflow { stages })
     }
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
     pub fn execute(&self) -> Result<()> {
-        let params_map = hashmap_new_from_kv_params(&self.params)?;
-        let mut jinja_ctx: Value = params_map.into();
         let mut merged: Value = Value::Object(Default::default());
 
         let mut iter = self.stages.iter().peekable();
@@ -93,12 +77,11 @@ impl Workflow {
                 stage.run(&merged)?;
             } else {
                 // Input stage
-                let value = stage.run(&jinja_ctx)?;
+                let value = stage.run(&merged)?;
 
-                cfg_values_deep_merge(&mut merged, value.clone())?;
                 // Update context. Values from the previous iterations could be re-used
                 // in the next iterations
-                cfg_values_deep_merge(&mut jinja_ctx, merged.clone())?;
+                cfg_values_deep_merge(&mut merged, value.clone())?;
             }
         }
 

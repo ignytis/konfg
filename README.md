@@ -92,23 +92,26 @@ konfg build [options]
 
 ### Options
 
-- `-i`, `--in <tokens...>`: Input specification. Can be used multiple times.
+- `-i`, `--input <args...>`: Input specification. Can be used multiple times.
   - `stdio <format>`: Read from standard input as `<format>`.
   - `file <path> <format>`: Read from `<path>` as `<format>`.
   - `file <path>`: Read from `<path>`, detecting format by extension.
+  - `param <key> <value>`: inject a single parameter. Use dots `.` for nested levels.
+     Use double dots `..` to escape the dots.
+  - `env <PREFIX>`: read environment variables. Double underscore `__` is separator.
+    Example: `MY_APP__TOP_LEVEL__SUB_LEVEL__MYVAR` will be processed is prefix is `MY_APP`
   - `<path>`: Shorthand for `file <path>`.
-- `-o`, `--out <tokens...>`: Output specification. (Default: `stdio yaml`).
+- `-o`, `--output <args...>`: Output specification. (Default: `stdio yaml`).
   - `stdio <format>`: Write to standard output as `<format>`.
   - `file <path> <format>`: Write to `<path>` as `<format>`.
   - `file <path>`: Write to `<path>`, detecting format by extension.
-- `-p`, `--param <KEY=VALUE>`: Specify parameters available in Jinja context. Can be used multiple times. Supports dotted notation (e.g., `my.param=value`).
 
 ## Merging Logic
 
 1. **Deep Merge**: Nested maps are merged recursively.
 2. **Overwriting**: If a key exists in multiple files, the value from the *later* file overwrites the earlier one.
 3. **Template Context**:
-   - Values passed via `--param` are available in all templates.
+   - Results of processing the previous inputs are available in context of next inputs
    - Scalar values (strings, numbers, booleans) from previously merged files are automatically added to the Jinja context for subsequent templates.
 
 ## Jinja
@@ -120,7 +123,7 @@ https://docs.rs/minijinja/latest/minijinja/functions/index.html#built-in-functio
 
 In addition, the following functions are defined:
 
-- `command(['arg1', 'arg2', ...])` - execute a system comand (_a pro tip: the output could be splitted using `lines` filter)
+- `command(['arg1', 'arg2', ...])` - execute a system command (_a pro tip: the output could be split using `lines` filter)
 - `env(name, default = '')` - read an environment variable
 - `md5(input)` - MD5 hash
 - `sha256(input)` - SHA256 hash
@@ -135,7 +138,7 @@ https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions
 ### Tests
 
 See Minijinja for standard tests like `is defined`:
-https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions
+https://docs.rs/minijinja/latest/minijinja/tests/index.html
 
 
 ## Example
@@ -159,17 +162,22 @@ env_value: {{ env('MY_ENV_VAR', 'default')  }}
 ### Command
 ```bash
 MY_ENV_VAR=this_is_env \
-  konfg build -i first.yaml -i second.yaml -p my.param=awesome
+  konfg build \
+    -i first.yaml \
+    -i param my.param awesome \
+    -i second.yaml
 ```
 
 ### Output (YAML)
 ```yaml
-base_value: "hello"
-derived_value: "hello world"
-some_dict:
-    nested_key: "overwritten"
-    new_key: "awesome"
+base_value: hello
+derived_value: hello world
 env_value: this_is_env
+my:
+  param: awesome
+some_dict:
+  nested_key: overwritten
+  new_key: awesome
 ```
 
 ### More Examples
@@ -228,13 +236,13 @@ konfg build -i database.env -o stdio json
 ```yaml
 app:
   version: "{{ env('APP_VERSION', '1.0.0') }}"
-  secret_hash: "{{ sha256(my_secret) }}"
+  secret_hash: "{{ sha256('topsecret') }}"
   files: {{ command(['ls', '-1', 'src']) | lines }}
 ```
 
 **Command**
 ```bash
-konfg build -i config.yaml -p my_secret=topsecret
+konfg build -i config.yaml
 ```
 
 **Output**
@@ -299,7 +307,7 @@ konfg build -i config.yaml -i env MYAPP -o stdio json
 - **JSON** (`.json`)
 - **TOML** (`.toml`)
 - **Properties** (`.properties`)
-- **dotenv** (`.env`)
+- **Dotenv** (`.env`)
 
 ## License
 GPL-3.0
