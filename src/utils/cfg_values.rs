@@ -5,13 +5,13 @@ use serde_json::Value;
 
 /// Deep-merge `src` into `dst`. Later values overwrite earlier ones for scalars.
 /// Merging a collection with a scalar (or vice-versa) is an error.
-pub fn cfg_values_deep_merge(dst: &mut Value, src: Value) -> Result<()> {
+pub fn cfg_values_deep_merge(dst: &mut Value, src: &Value) -> Result<()> {
     match (dst, src) {
         (Value::Object(d), Value::Object(s)) => {
             for (k, sv) in s {
                 let dv = d.entry(k).or_insert(Value::Null);
                 if dv.is_null() {
-                    *dv = sv;
+                    *dv = sv.clone();
                 } else {
                     cfg_values_deep_merge(dv, sv)?;
                 }
@@ -19,7 +19,7 @@ pub fn cfg_values_deep_merge(dst: &mut Value, src: Value) -> Result<()> {
         }
         (Value::Array(d), Value::Array(s)) => {
             // Replace array wholesale (last wins)
-            *d = s.into_iter().collect();
+            *d = s.clone().into_iter().collect();
         }
         (dst, src) => {
             // Disallow overwriting a collection with a scalar or vice-versa
@@ -32,7 +32,7 @@ pub fn cfg_values_deep_merge(dst: &mut Value, src: Value) -> Result<()> {
                     if src_is_coll { "collection" } else { "scalar" }
                 );
             }
-            *dst = src;
+            *dst = src.clone();
         }
     }
     Ok(())
@@ -53,7 +53,7 @@ mod tests {
             "key3": "val3"
         });
 
-        cfg_values_deep_merge(&mut dst, src)?;
+        cfg_values_deep_merge(&mut dst, &src)?;
 
         assert_eq!(
             dst,
@@ -77,7 +77,7 @@ mod tests {
             "key1": "new_val1"
         });
 
-        cfg_values_deep_merge(&mut dst, src)?;
+        cfg_values_deep_merge(&mut dst, &src)?;
 
         assert_eq!(
             dst,
@@ -103,7 +103,7 @@ mod tests {
             }
         });
 
-        cfg_values_deep_merge(&mut dst, src)?;
+        cfg_values_deep_merge(&mut dst, &src)?;
 
         assert_eq!(
             dst,
@@ -123,7 +123,7 @@ mod tests {
         let mut dst = json!(["a", "b"]);
         let src = json!(["c", "d"]);
 
-        cfg_values_deep_merge(&mut dst, src)?;
+        cfg_values_deep_merge(&mut dst, &src)?;
 
         assert_eq!(dst, json!(["c", "d"]));
 
@@ -139,7 +139,7 @@ mod tests {
             "key1": ["a", "b"]
         });
 
-        assert!(cfg_values_deep_merge(&mut dst, src).is_err());
+        assert!(cfg_values_deep_merge(&mut dst, &src).is_err());
 
         Ok(())
     }

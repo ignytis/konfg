@@ -6,7 +6,11 @@ use std::collections::{LinkedList, VecDeque};
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
-use crate::{jinja::JinjaEngine, utils::cfg_values::cfg_values_deep_merge, workflow::stage::Stage};
+use crate::{
+    jinja::JinjaEngine,
+    utils::cfg_values::cfg_values_deep_merge,
+    workflow::stage::{Stage, StageKind},
+};
 
 /// Constants for command-line arguments.
 const TOKEN_INPUT_SHORT: &str = "-i";
@@ -70,7 +74,12 @@ impl Workflow {
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
             let value = stage.run(&merged)?;
-            cfg_values_deep_merge(&mut merged, value.clone())?;
+            // Update the context for results of input stage only.
+            // Output stage returns Null and cannot be merged into compiled config
+            match stage.kind {
+                StageKind::Input(_) => cfg_values_deep_merge(&mut merged, &value)?,
+                _ => {}
+            };
         }
 
         Ok(())
