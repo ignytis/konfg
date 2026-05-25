@@ -54,7 +54,30 @@ env_var = "env_value"
 some_key = "some value"
 ```
 
-The second example uses config from this repository, so please clone it before running the command.
+And finally, a zero-file example with parameters and filters:
+
+```bash
+docker run --rm \
+  --network none \
+  ignytis/konfg:latest \
+    build \
+      -i param server.host 0.0.0.0 \
+      -i param server.port 8080 \
+      -i param temp.debug true \
+      -f move server config \
+      -f delete temp \
+      -o stdio json
+
+# Output
+{
+  "config": {
+    "host": "0.0.0.0",
+    "port": "8080"
+  }
+}
+```
+
+The next example uses config from this repository, so please clone it before running the command.
 
 ```bash
 docker run --rm \
