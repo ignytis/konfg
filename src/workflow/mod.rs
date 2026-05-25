@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::{
     jinja::JinjaEngine,
     utils::cfg_values::cfg_values_deep_merge,
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageKind, StageParserFn},
 };
 
 /// Constants for command-line arguments.
@@ -36,23 +36,14 @@ impl Workflow {
         let mut stages = LinkedList::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
-            match tok.as_str() {
-                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
-                    let buf = parse_arg_buffer(&mut queue);
-                    stages.push_back(Stage::try_from_strings(buf, &jinja, false)?);
-                }
-                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
-                    let buf = parse_arg_buffer(&mut queue);
-                    stages.push_back(Stage::try_from_strings(buf, &jinja, true)?);
-                }
-                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => {
-                    let buf = parse_arg_buffer(&mut queue);
-                    stages.push_back(Stage::try_from_strings_filter(buf, &jinja)?);
-                }
-                other => {
-                    return Err(anyhow!("Unexpected argument: {}", other));
-                }
-            }
+            let buf = parse_arg_buffer(&mut queue);
+            let fn_parse_args: StageParserFn = match tok.as_str() {
+                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
+                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
+                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => Stage::try_from_strings_filter,
+                other => return Err(anyhow!("Unexpected argument: {}", other)),
+            };
+            stages.push_back(fn_parse_args(buf, &jinja)?);
         }
 
         // Validation: The first stage must be an input stage
@@ -65,11 +56,7 @@ impl Workflow {
         // Validation: The last stage must be an output stage. If not, add default.
         let last_is_output = stages.back().map_or(false, |last| last.is_output());
         if !last_is_output {
-            stages.push_back(Stage::try_from_strings(
-                VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]),
-                &jinja,
-                true,
-            )?);
+            stages.push_back(Stage::new_output_default());
         }
 
         Ok(Workflow { stages })

@@ -8,7 +8,9 @@ use crate::{
     jinja::JinjaEngine,
     workflow::{
         filters::{Filter, REGISTERED_FILTERS, TryParseFilterResult},
-        io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult},
+        io::{
+            InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult, stdio::StdioHandler,
+        },
     },
 };
 
@@ -25,12 +27,23 @@ pub struct Stage {
     pub jinja_engine: JinjaEngine,
 }
 
+/// A definition of stage parser function
+pub type StageParserFn = fn(VecDeque<String>, &JinjaEngine) -> Result<Stage>;
+
 impl Stage {
     pub fn new(kind: StageKind, args: HashMap<String, String>, jinja_engine: JinjaEngine) -> Self {
         Self {
             kind,
             args,
             jinja_engine,
+        }
+    }
+
+    pub fn new_output_default() -> Self {
+        Stage {
+            kind: StageKind::Output(Box::new(StdioHandler {})),
+            args: HashMap::default(),
+            jinja_engine: JinjaEngine::new(),
         }
     }
 
@@ -71,15 +84,32 @@ impl Stage {
     }
 
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
-    /// `tokens` is a VecDeque of string parameters for single input / output.
+    /// `tokens` is a VecDeque of string parameters for single input.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings(
+    pub fn try_from_strings_input(
         mut tokens: VecDeque<String>,
         jinja: &JinjaEngine,
-        is_output: bool,
     ) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
-            match io_handler.try_parse_args(&mut tokens, &jinja, is_output) {
+            match io_handler.try_parse_args(&mut tokens, &jinja, false) {
+                TryParseResult::Success(s) => return Ok(s),
+                TryParseResult::NotSupported => continue,
+                TryParseResult::Error(e) => return Err(e),
+            }
+        }
+
+        return Err(anyhow!("Unrecognized input argument: {:?}", tokens));
+    }
+
+    /// Parses a flat list of arguments into a `Stage` using registered handlers.
+    /// `tokens` is a VecDeque of string parameters for single output.
+    /// Example: ['file', '/path/to/file.cfg', 'yaml']
+    pub fn try_from_strings_output(
+        mut tokens: VecDeque<String>,
+        jinja: &JinjaEngine,
+    ) -> Result<Stage> {
+        for io_handler in REGISTERED_HANDLERS.iter() {
+            match io_handler.try_parse_args(&mut tokens, &jinja, true) {
                 TryParseResult::Success(s) => return Ok(s),
                 TryParseResult::NotSupported => continue,
                 TryParseResult::Error(e) => return Err(e),
