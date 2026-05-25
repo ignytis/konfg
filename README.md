@@ -108,6 +108,7 @@ konfg build [options]
   - `file <path>`: Write to `<path>`, detecting format by extension.
 - `-f`, `--filter <args...>`: Filter specification. Can be used multiple times.
   - `delete <key>`: Remove a parameter from the configuration. Use dots `.` for nested levels.
+  - `move <source> <destination>`: Move a parameter from `<source>` to `<destination>`. Use `.` for the root level.
 
 ## Merging Logic
 
@@ -325,6 +326,19 @@ konfg build \
 
 - Files (see `Supported formats` below)
 - Stdin/Stdout
+- Environment variables (input only)
+
+## Supported Formats
+
+- **YAML** (`.yaml`, `.yml`)
+- **JSON** (`.json`)
+- **TOML** (`.toml`)
+- **Properties** (`.properties`)
+- **Dotenv** (`.env`)
+
+## License
+GPL-3.0
+tdout
 - Environment variables (input only)
 
 ## Supported Formats

@@ -1,4 +1,5 @@
 pub mod delete;
+pub mod move_filter;
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -10,8 +11,12 @@ use serde_json::Value;
 
 use crate::{jinja::JinjaEngine, workflow::stage::Stage};
 
-pub const REGISTERED_FILTERS: LazyLock<Vec<Box<dyn BaseFilter>>> =
-    LazyLock::new(|| vec![Box::new(delete::DeleteFilter)]);
+pub const REGISTERED_FILTERS: LazyLock<Vec<Box<dyn BaseFilter>>> = LazyLock::new(|| {
+    vec![
+        Box::new(delete::DeleteFilter),
+        Box::new(move_filter::MoveFilter),
+    ]
+});
 
 /// Result of attempting to parse tokens by a filter.
 pub enum TryParseFilterResult {

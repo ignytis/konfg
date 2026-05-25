@@ -106,6 +106,34 @@ pub fn hashmap_delete_nested_value(
     map
 }
 
+/// Extracts a value from `map` using `parts` as a path.
+/// Returns the updated map and the extracted value.
+pub fn hashmap_extract_nested_value(
+    mut map: serde_json::Map<String, Value>,
+    parts: &[String],
+) -> (serde_json::Map<String, Value>, Option<Value>) {
+    if parts.is_empty() {
+        return (map, None);
+    }
+    if parts.len() == 1 {
+        let val = map.remove(&parts[0]);
+        return (map, val);
+    }
+
+    let head = &parts[0];
+    let tail = &parts[1..];
+
+    if let Some(Value::Object(inner_map)) = map.remove(head) {
+        let (updated_inner, val) = hashmap_extract_nested_value(inner_map, tail);
+        if !updated_inner.is_empty() {
+            map.insert(head.clone(), Value::Object(updated_inner));
+        }
+        (map, val)
+    } else {
+        (map, None)
+    }
+}
+
 /// Flattens a nested `Value` into a flat `HashMap<String, String>` using the provided delimiter.
 pub fn hashmap_flatten(
     value: &Value,
@@ -227,6 +255,17 @@ mod tests {
             &["a".to_string(), "b".to_string(), "d".to_string()],
         );
         assert_eq!(Value::Object(updated2), json!({}));
+    }
+
+    #[test]
+    fn test_hashmap_extract_nested_value() {
+        let mut map = serde_json::Map::new();
+        map.insert("a".to_string(), json!({"b": {"c": 1, "d": 2}}));
+
+        let (updated, val) =
+            hashmap_extract_nested_value(map, &["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(val, Some(json!(1)));
+        assert_eq!(Value::Object(updated), json!({"a": {"b": {"d": 2}}}));
     }
 
     #[test]

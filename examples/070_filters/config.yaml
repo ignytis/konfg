@@ -1,0 +1,9 @@
+user:
+  name: "John Doe"
+  role: "admin"
+  password: "supersecretpassword"
+server:
+  host: "{{ _globals.default_host }}"
+  port: {{ _globals.default_port }}
+app:
+  name: "{{ _globals.app_name }}"
