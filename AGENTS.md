@@ -10,6 +10,7 @@
 - **Jinja2 Templating:** Power your configurations with `minijinja`. Access CLI parameters and previously merged configuration values within templates.
 - **Deep Merging:** Intelligently merges nested objects. Arrays are replaced wholesale (later values win).
 - **Flexible Input/Output:** Supports multiple input sources and output destinations via `stdio` and `file` handlers.
+- **Filters:** Modify the merged configuration using filters (e.g., `delete` to remove specific parameters).
 - **Format Auto-detection:** Automatically detects formats based on file extensions or explicitly provided tokens.
 
 ## Architecture
@@ -20,6 +21,7 @@ The project is structured into modular components:
 - **`src/cli/`:** CLI parsing (via `clap`) and command implementations (e.g., `build`).
 - **`src/handlers/format/`:** Implementations for parsing and serializing different configuration formats.
 - **`src/workflow/io/`:** Handles reading from and writing to different targets (files, env, param, stdio).
+- **`src/workflow/filters/`:** Implements filters to modify the merged configuration.
 - **`src/workflow/`:** Workflow logic and the `Stage` structure.
 - **`src/utils/`:** Utility functions for deep merging (`cfg_values`) and parameter handling (`hashmap`).
 - **`src/jinja/`:** Jinja2 template rendering logic.

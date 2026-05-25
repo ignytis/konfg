@@ -7,6 +7,7 @@
 - **Multi-format Support**: Seamlessly merge and convert between YAML, JSON, TOML, properties, and dotenv.
 - **Deep Merging**: Intelligently merges nested objects. Later files overwrite values of earlier files.
 - **Jinja2 Templating**: Use `minijinja` to power your configurations. Access CLI parameters and previously merged values directly within your templates.
+- **Filters**: Modify the merged configuration using filters, such as deleting specific parameters.
 - **Flexible I/O**: Support for multiple input sources and output destinations via `stdio` and `file` handlers.
 - **Format Auto-detection**: Automatically detects formats based on file extensions or explicit CLI tokens.
 
@@ -105,6 +106,8 @@ konfg build [options]
   - `stdio <format>`: Write to standard output as `<format>`.
   - `file <path> <format>`: Write to `<path>` as `<format>`.
   - `file <path>`: Write to `<path>`, detecting format by extension.
+- `-f`, `--filter <args...>`: Filter specification. Can be used multiple times.
+  - `delete <key>`: Remove a parameter from the configuration. Use dots `.` for nested levels.
 
 ## Merging Logic
 
@@ -289,6 +292,29 @@ konfg build -i config.yaml -i env MYAPP -o stdio json
   },
   "server": {
     "port": "9000"
+  }
+}
+```
+
+#### 5. Use Filters
+You can remove sensitive or unnecessary data from the final configuration using filters.
+
+**Command**
+```bash
+konfg build \
+  -i config.yaml \
+  -f delete server.host \
+  -o stdio json
+```
+
+**Output**
+```json
+{
+  "database": {
+    "url": "postgresql://localhost:5432/db"
+  },
+  "server": {
+    "port": 8080
   }
 }
 ```
