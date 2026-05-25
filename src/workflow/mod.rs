@@ -1,3 +1,4 @@
+pub mod filters;
 pub mod io;
 pub mod stage;
 
@@ -17,6 +18,8 @@ const TOKEN_INPUT_SHORT: &str = "-i";
 const TOKEN_INPUT_LONG: &str = "--input";
 const TOKEN_OUTPUT_SHORT: &str = "-o";
 const TOKEN_OUTPUT_LONG: &str = "--output";
+const TOKEN_FILTER_SHORT: &str = "-f";
+const TOKEN_FILTER_LONG: &str = "--filter";
 
 /// Represents a configuration building workflow.
 pub struct Workflow {
@@ -41,6 +44,10 @@ impl Workflow {
                 TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
                     let buf = parse_arg_buffer(&mut queue);
                     stages.push_back(Stage::try_from_strings(buf, &jinja, true)?);
+                }
+                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => {
+                    let buf = parse_arg_buffer(&mut queue);
+                    stages.push_back(Stage::try_from_strings_filter(buf, &jinja)?);
                 }
                 other => {
                     return Err(anyhow!("Unexpected argument: {}", other));
@@ -73,7 +80,7 @@ impl Workflow {
         let mut merged: Value = Value::Object(Default::default());
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
-            let value = stage.run(&merged)?;
+            let value = stage.run(&mut merged)?;
             // Update the context for results of input stage only.
             // Output stage returns Null and cannot be merged into compiled config
             match stage.kind {
@@ -96,6 +103,8 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
             || next == TOKEN_INPUT_LONG
             || next == TOKEN_OUTPUT_SHORT
             || next == TOKEN_OUTPUT_LONG
+            || next == TOKEN_FILTER_SHORT
+            || next == TOKEN_FILTER_LONG
         {
             break;
         }

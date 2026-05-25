@@ -6,12 +6,16 @@ use serde_json::Value;
 use crate::{
     handlers::format::get_handler_for_format,
     jinja::JinjaEngine,
-    workflow::io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult},
+    workflow::{
+        filters::{Filter, REGISTERED_FILTERS, TryParseFilterResult},
+        io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult},
+    },
 };
 
 pub enum StageKind {
     Input(Box<dyn InputHandler>),
     Output(Box<dyn OutputHandler>),
+    Filter(Box<dyn Filter>),
 }
 
 /// Represents a configuration source or destination with associated IO and format handlers.
@@ -40,8 +44,13 @@ impl Stage {
         matches!(self.kind, StageKind::Output(_))
     }
 
-    /// Executes the stage: reads content for input stages, or writes content for output stages.
-    pub fn run(&self, value: &Value) -> Result<Value> {
+    /// Returns true if the stage is a filter stage.
+    pub fn is_filter(&self) -> bool {
+        matches!(self.kind, StageKind::Filter(_))
+    }
+
+    /// Executes the stage: reads content for input stages, writes content for output stages, or applies filter for filter stages.
+    pub fn run(&self, value: &mut Value) -> Result<Value> {
         match &self.kind {
             StageKind::Input(handler) => handler.read(&self.args, &self.jinja_engine, value),
             StageKind::Output(handler) => {
@@ -52,6 +61,10 @@ impl Stage {
                     None => value.to_string(),
                 };
                 handler.write(&serialized_value, &self.args)?;
+                Ok(Value::Null)
+            }
+            StageKind::Filter(handler) => {
+                handler.apply(&self.args, value)?;
                 Ok(Value::Null)
             }
         }
@@ -74,5 +87,21 @@ impl Stage {
         }
 
         return Err(anyhow!("Unrecognized input argument: {:?}", tokens));
+    }
+
+    /// Parses a flat list of arguments into a `Stage` using registered filter handlers.
+    pub fn try_from_strings_filter(
+        mut tokens: VecDeque<String>,
+        jinja: &JinjaEngine,
+    ) -> Result<Stage> {
+        for filter_handler in REGISTERED_FILTERS.iter() {
+            match filter_handler.try_parse_args(&mut tokens, &jinja) {
+                TryParseFilterResult::Success(s) => return Ok(s),
+                TryParseFilterResult::NotSupported => continue,
+                TryParseFilterResult::Error(e) => return Err(e),
+            }
+        }
+
+        return Err(anyhow!("Unrecognized filter argument: {:?}", tokens));
     }
 }
