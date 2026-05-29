@@ -7,9 +7,11 @@ use std::{
 };
 
 use anyhow::Result;
-use serde_json::Value;
 
-use crate::{jinja::JinjaEngine, workflow::stage::Stage};
+use crate::{
+    jinja::JinjaEngine,
+    workflow::stage::{Stage, StageExecutionContext},
+};
 
 pub const REGISTERED_FILTERS: LazyLock<Vec<Box<dyn BaseFilter>>> = LazyLock::new(|| {
     vec![
@@ -48,7 +50,7 @@ pub trait BaseFilter: Send + Sync {
 /// Trait for handling filter operations.
 pub trait Filter: BaseFilter {
     /// Applies the filter to the merged configuration.
-    fn apply(&self, args: &HashMap<String, String>, merged: &mut Value) -> Result<()>;
+    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()>;
 }
 
 impl Clone for Box<dyn BaseFilter> {

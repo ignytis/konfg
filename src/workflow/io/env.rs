@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use crate::{
     jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "env";
@@ -66,7 +66,7 @@ impl InputHandler for EnvHandler {
         &self,
         args: &HashMap<String, String>,
         _jinja: &JinjaEngine,
-        _context: &serde_json::Value,
+        _context: &StageExecutionContext,
     ) -> Result<Value> {
         let mut res: Map<String, Value> = Map::new();
         let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
@@ -109,7 +109,9 @@ mod tests {
         args.insert("prefix".to_string(), format!("{}__MYAPP", ENV_VAR_PREFIX));
 
         let jinja = JinjaEngine::new();
-        let context = serde_json::Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: serde_json::Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         let obj = content.as_object().unwrap();

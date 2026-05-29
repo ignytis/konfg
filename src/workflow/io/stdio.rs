@@ -8,7 +8,7 @@ use crate::{
     handlers::format::get_handler_for_format,
     jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler, OutputHandler, TryParseResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "stdio";
@@ -59,11 +59,11 @@ impl InputHandler for StdioHandler {
         &self,
         args: &HashMap<String, String>,
         jinja: &JinjaEngine,
-        context: &serde_json::Value,
+        context: &StageExecutionContext,
     ) -> Result<Value> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
-        let rendered = jinja.render(&buf, context)?;
+        let rendered = jinja.render(&buf, &context.current_config)?;
 
         match args.get("format") {
             Some(f) => get_handler_for_format(f)
@@ -77,7 +77,12 @@ impl InputHandler for StdioHandler {
 }
 
 impl OutputHandler for StdioHandler {
-    fn write(&self, content: &str, _args: &HashMap<String, String>) -> Result<()> {
+    fn write(
+        &self,
+        content: &str,
+        _args: &HashMap<String, String>,
+        _context: &StageExecutionContext,
+    ) -> Result<()> {
         std::io::stdout().write_all(content.as_bytes())?;
         Ok(())
     }

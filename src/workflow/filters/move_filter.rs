@@ -9,7 +9,7 @@ use crate::{
         hashmap_extract_nested_value, hashmap_insert_nested_value, hashmap_parse_key_parts,
     },
     workflow::filters::{BaseFilter, Filter, TryParseFilterResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "move";
@@ -66,7 +66,7 @@ impl BaseFilter for MoveFilter {
 }
 
 impl Filter for MoveFilter {
-    fn apply(&self, args: &HashMap<String, String>, merged: &mut Value) -> Result<()> {
+    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()> {
         let source = args
             .get("source")
             .ok_or_else(|| anyhow!("Move filter: source is not specified"))?;
@@ -80,12 +80,12 @@ impl Filter for MoveFilter {
 
         let value_to_move = if source == "." {
             Some(std::mem::replace(
-                merged,
+                &mut context.current_config,
                 Value::Object(serde_json::Map::new()),
             ))
         } else {
             let parts = hashmap_parse_key_parts(source);
-            if let Value::Object(map) = merged {
+            if let Value::Object(map) = &mut context.current_config {
                 let original_map = std::mem::take(map);
                 let (updated_map, val) = hashmap_extract_nested_value(original_map, &parts);
                 *map = updated_map;
@@ -97,10 +97,10 @@ impl Filter for MoveFilter {
 
         if let Some(val) = value_to_move {
             if destination == "." {
-                *merged = val;
+                context.current_config = val;
             } else {
                 let dest_parts = hashmap_parse_key_parts(destination);
-                if let Value::Object(map) = merged {
+                if let Value::Object(map) = &mut context.current_config {
                     let original_map = std::mem::take(map);
                     let updated_map = hashmap_insert_nested_value(original_map, &dest_parts, val);
                     *map = updated_map;
@@ -108,10 +108,10 @@ impl Filter for MoveFilter {
                     // If merged is not an object, we can't insert into it unless destination is "."
                     // which is handled above. If it's a scalar, we might want to wrap it or error.
                     // Given the context of konfg, merged is usually an object.
-                    if merged.is_null() {
+                    if context.current_config.is_null() {
                         let map = serde_json::Map::new();
                         let updated_map = hashmap_insert_nested_value(map, &dest_parts, val);
-                        *merged = Value::Object(updated_map);
+                        context.current_config = Value::Object(updated_map);
                     } else {
                         return Err(anyhow!(
                             "Move filter: cannot move to nested key in non-object configuration"
@@ -137,15 +137,17 @@ mod tests {
         args.insert("source".to_string(), "a".to_string());
         args.insert("destination".to_string(), "b".to_string());
 
-        let mut merged = json!({
-            "a": 1,
-            "x": 2
-        });
+        let mut context = StageExecutionContext {
+            current_config: json!({
+                "a": 1,
+                "x": 2
+            }),
+        };
 
-        filter.apply(&args, &mut merged).unwrap();
+        filter.apply(&args, &mut context).unwrap();
 
         assert_eq!(
-            merged,
+            context.current_config,
             json!({
                 "b": 1,
                 "x": 2
@@ -160,16 +162,18 @@ mod tests {
         args.insert("source".to_string(), "a.b".to_string());
         args.insert("destination".to_string(), "c.d".to_string());
 
-        let mut merged = json!({
-            "a": {
-                "b": 1
-            }
-        });
+        let mut context = StageExecutionContext {
+            current_config: json!({
+                "a": {
+                    "b": 1
+                }
+            }),
+        };
 
-        filter.apply(&args, &mut merged).unwrap();
+        filter.apply(&args, &mut context).unwrap();
 
         assert_eq!(
-            merged,
+            context.current_config,
             json!({
                 "c": {
                     "d": 1
@@ -185,15 +189,17 @@ mod tests {
         args.insert("source".to_string(), ".".to_string());
         args.insert("destination".to_string(), "config".to_string());
 
-        let mut merged = json!({
-            "a": 1,
-            "b": 2
-        });
+        let mut context = StageExecutionContext {
+            current_config: json!({
+                "a": 1,
+                "b": 2
+            }),
+        };
 
-        filter.apply(&args, &mut merged).unwrap();
+        filter.apply(&args, &mut context).unwrap();
 
         assert_eq!(
-            merged,
+            context.current_config,
             json!({
                 "config": {
                     "a": 1,
@@ -210,18 +216,20 @@ mod tests {
         args.insert("source".to_string(), "config".to_string());
         args.insert("destination".to_string(), ".".to_string());
 
-        let mut merged = json!({
-            "config": {
-                "a": 1,
-                "b": 2
-            },
-            "other": 3
-        });
+        let mut context = StageExecutionContext {
+            current_config: json!({
+                "config": {
+                    "a": 1,
+                    "b": 2
+                },
+                "other": 3
+            }),
+        };
 
-        filter.apply(&args, &mut merged).unwrap();
+        filter.apply(&args, &mut context).unwrap();
 
         assert_eq!(
-            merged,
+            context.current_config,
             json!({
                 "a": 1,
                 "b": 2

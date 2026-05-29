@@ -7,7 +7,7 @@ use crate::{
     jinja::JinjaEngine,
     utils::hashmap::{hashmap_delete_nested_value, hashmap_parse_key_parts},
     workflow::filters::{BaseFilter, Filter, TryParseFilterResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "delete";
@@ -53,14 +53,14 @@ impl BaseFilter for DeleteFilter {
 }
 
 impl Filter for DeleteFilter {
-    fn apply(&self, args: &HashMap<String, String>, merged: &mut Value) -> Result<()> {
+    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()> {
         let key = args
             .get("key")
             .ok_or_else(|| anyhow!("Delete filter: key is not specified"))?;
 
         let parts = hashmap_parse_key_parts(key);
 
-        if let Value::Object(map) = merged {
+        if let Value::Object(map) = &mut context.current_config {
             // We need to take ownership of the map to modify it if we use our utility
             let original_map = std::mem::take(map);
             let updated_map = hashmap_delete_nested_value(original_map, &parts);
@@ -82,18 +82,20 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("key".to_string(), "a.b".to_string());
 
-        let mut merged = json!({
-            "a": {
-                "b": 1,
-                "c": 2
-            },
-            "x": 3
-        });
+        let mut context = StageExecutionContext {
+            current_config: json!({
+                "a": {
+                    "b": 1,
+                    "c": 2
+                },
+                "x": 3
+            }),
+        };
 
-        filter.apply(&args, &mut merged).unwrap();
+        filter.apply(&args, &mut context).unwrap();
 
         assert_eq!(
-            merged,
+            context.current_config,
             json!({
                 "a": {
                     "c": 2

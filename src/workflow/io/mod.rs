@@ -11,7 +11,10 @@ use std::{
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::{jinja::JinjaEngine, workflow::stage::Stage};
+use crate::{
+    jinja::JinjaEngine,
+    workflow::stage::{Stage, StageExecutionContext},
+};
 
 pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn BaseIoHandler>>> = LazyLock::new(|| {
     vec![
@@ -57,14 +60,19 @@ pub trait InputHandler: BaseIoHandler {
         &self,
         args: &HashMap<String, String>,
         jinja: &JinjaEngine,
-        context: &Value,
+        context: &StageExecutionContext,
     ) -> Result<Value>;
 }
 
 /// Trait for handling output operations.
 pub trait OutputHandler: BaseIoHandler {
     /// Writes serialized content to the destination.
-    fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()>;
+    fn write(
+        &self,
+        content: &str,
+        args: &HashMap<String, String>,
+        context: &StageExecutionContext,
+    ) -> Result<()>;
 }
 
 impl Clone for Box<dyn BaseIoHandler> {

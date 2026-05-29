@@ -20,6 +20,19 @@ pub enum StageKind {
     Filter(Box<dyn Filter>),
 }
 
+/// Execution context for a stage.
+pub struct StageExecutionContext {
+    pub current_config: Value,
+}
+
+impl StageExecutionContext {
+    pub fn new() -> Self {
+        Self {
+            current_config: Value::Object(Default::default()),
+        }
+    }
+}
+
 /// Represents a configuration source or destination with associated IO and format handlers.
 pub struct Stage {
     pub kind: StageKind,
@@ -63,21 +76,21 @@ impl Stage {
     }
 
     /// Executes the stage: reads content for input stages, writes content for output stages, or applies filter for filter stages.
-    pub fn run(&self, value: &mut Value) -> Result<Value> {
+    pub fn run(&self, context: &mut StageExecutionContext) -> Result<Value> {
         match &self.kind {
-            StageKind::Input(handler) => handler.read(&self.args, &self.jinja_engine, value),
+            StageKind::Input(handler) => handler.read(&self.args, &self.jinja_engine, context),
             StageKind::Output(handler) => {
                 let serialized_value = match self.args.get("format") {
                     Some(f) => get_handler_for_format(f)
                         .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                        .serialize(value)?,
-                    None => value.to_string(),
+                        .serialize(&context.current_config)?,
+                    None => context.current_config.to_string(),
                 };
-                handler.write(&serialized_value, &self.args)?;
+                handler.write(&serialized_value, &self.args, context)?;
                 Ok(Value::Null)
             }
             StageKind::Filter(handler) => {
-                handler.apply(&self.args, value)?;
+                handler.apply(&self.args, context)?;
                 Ok(Value::Null)
             }
         }

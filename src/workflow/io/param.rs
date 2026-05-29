@@ -7,7 +7,7 @@ use crate::{
     jinja::JinjaEngine,
     utils::hashmap::{hashmap_insert_nested_value, hashmap_parse_key_parts},
     workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "param";
@@ -68,7 +68,7 @@ impl InputHandler for ParamHandler {
         &self,
         args: &HashMap<String, String>,
         _jinja: &JinjaEngine,
-        _context: &serde_json::Value,
+        _context: &StageExecutionContext,
     ) -> Result<Value> {
         let key = args
             .get("key")
@@ -104,7 +104,9 @@ mod tests {
         args.insert("value".to_string(), "my_value".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"my_key": "my_value"}));
@@ -118,7 +120,9 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
@@ -141,7 +145,9 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
@@ -162,7 +168,9 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"a..b": "val"}));
@@ -176,7 +184,9 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"a.": "val"}));
@@ -190,7 +200,9 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = Value::Object(Default::default());
+        let context = StageExecutionContext {
+            current_config: Value::Object(Default::default()),
+        };
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(

@@ -5,12 +5,11 @@ pub mod stage;
 use std::collections::{LinkedList, VecDeque};
 
 use anyhow::{Result, anyhow};
-use serde_json::Value;
 
 use crate::{
     jinja::JinjaEngine,
     utils::cfg_values::cfg_values_deep_merge,
-    workflow::stage::{Stage, StageKind, StageParserFn},
+    workflow::stage::{Stage, StageExecutionContext, StageKind, StageParserFn},
 };
 
 /// Constants for command-line arguments.
@@ -64,14 +63,16 @@ impl Workflow {
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
     pub fn execute(&self) -> Result<()> {
-        let mut merged: Value = Value::Object(Default::default());
+        let mut context = StageExecutionContext::new();
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
-            let value = stage.run(&mut merged)?;
+            let value = stage.run(&mut context)?;
             // Update the context for results of input stage only.
             // Output stage returns Null and cannot be merged into compiled config
             match stage.kind {
-                StageKind::Input(_) => cfg_values_deep_merge(&mut merged, &value)?,
+                StageKind::Input(_) => {
+                    cfg_values_deep_merge(&mut context.current_config, &value)?
+                }
                 _ => {}
             };
         }

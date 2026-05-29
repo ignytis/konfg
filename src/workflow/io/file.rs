@@ -10,7 +10,7 @@ use crate::{
     handlers::format::{self, get_handler_for_format},
     jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler, OutputHandler, TryParseResult},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 const KIND: &str = "file";
@@ -100,13 +100,13 @@ impl InputHandler for FileHandler {
         &self,
         args: &HashMap<String, String>,
         jinja: &JinjaEngine,
-        context: &serde_json::Value,
+        context: &StageExecutionContext,
     ) -> Result<Value> {
         let path = args
             .get("path")
             .ok_or_else(|| anyhow!("File handler: path is not specified"))?;
         let raw = fs::read_to_string(path)?;
-        let rendered = jinja.render(&raw, context)?;
+        let rendered = jinja.render(&raw, &context.current_config)?;
 
         match args.get("format") {
             Some(f) => get_handler_for_format(f)
@@ -120,7 +120,12 @@ impl InputHandler for FileHandler {
 }
 
 impl OutputHandler for FileHandler {
-    fn write(&self, content: &str, args: &HashMap<String, String>) -> Result<()> {
+    fn write(
+        &self,
+        content: &str,
+        args: &HashMap<String, String>,
+        _context: &StageExecutionContext,
+    ) -> Result<()> {
         let path = match args.get("path") {
             Some(p) => p,
             None => return Err(anyhow!("File handler: path is not specified")),
