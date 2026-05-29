@@ -53,7 +53,11 @@ impl BaseFilter for DeleteFilter {
 }
 
 impl Filter for DeleteFilter {
-    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()> {
+    fn apply(
+        &self,
+        args: &HashMap<String, String>,
+        context: &mut StageExecutionContext,
+    ) -> Result<()> {
         let key = args
             .get("key")
             .ok_or_else(|| anyhow!("Delete filter: key is not specified"))?;
@@ -90,6 +94,7 @@ mod tests {
                 },
                 "x": 3
             }),
+            ..Default::default()
         };
 
         filter.apply(&args, &mut context).unwrap();

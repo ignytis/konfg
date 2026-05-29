@@ -70,9 +70,7 @@ impl Workflow {
             // Update the context for results of input stage only.
             // Output stage returns Null and cannot be merged into compiled config
             match stage.kind {
-                StageKind::Input(_) => {
-                    cfg_values_deep_merge(&mut context.current_config, &value)?
-                }
+                StageKind::Input(_) => cfg_values_deep_merge(&mut context.current_config, &value)?,
                 _ => {}
             };
         }

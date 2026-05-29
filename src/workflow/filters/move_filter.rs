@@ -66,7 +66,11 @@ impl BaseFilter for MoveFilter {
 }
 
 impl Filter for MoveFilter {
-    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()> {
+    fn apply(
+        &self,
+        args: &HashMap<String, String>,
+        context: &mut StageExecutionContext,
+    ) -> Result<()> {
         let source = args
             .get("source")
             .ok_or_else(|| anyhow!("Move filter: source is not specified"))?;
@@ -142,6 +146,7 @@ mod tests {
                 "a": 1,
                 "x": 2
             }),
+            ..Default::default()
         };
 
         filter.apply(&args, &mut context).unwrap();
@@ -168,6 +173,7 @@ mod tests {
                     "b": 1
                 }
             }),
+            ..Default::default()
         };
 
         filter.apply(&args, &mut context).unwrap();
@@ -194,6 +200,7 @@ mod tests {
                 "a": 1,
                 "b": 2
             }),
+            ..Default::default()
         };
 
         filter.apply(&args, &mut context).unwrap();
@@ -224,6 +231,7 @@ mod tests {
                 },
                 "other": 3
             }),
+            ..Default::default()
         };
 
         filter.apply(&args, &mut context).unwrap();

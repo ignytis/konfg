@@ -1,5 +1,6 @@
 pub mod delete;
 pub mod move_filter;
+pub mod stash;
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -17,6 +18,7 @@ pub const REGISTERED_FILTERS: LazyLock<Vec<Box<dyn BaseFilter>>> = LazyLock::new
     vec![
         Box::new(delete::DeleteFilter),
         Box::new(move_filter::MoveFilter),
+        Box::new(stash::StashFilter),
     ]
 });
 
@@ -50,7 +52,11 @@ pub trait BaseFilter: Send + Sync {
 /// Trait for handling filter operations.
 pub trait Filter: BaseFilter {
     /// Applies the filter to the merged configuration.
-    fn apply(&self, args: &HashMap<String, String>, context: &mut StageExecutionContext) -> Result<()>;
+    fn apply(
+        &self,
+        args: &HashMap<String, String>,
+        context: &mut StageExecutionContext,
+    ) -> Result<()>;
 }
 
 impl Clone for Box<dyn BaseFilter> {

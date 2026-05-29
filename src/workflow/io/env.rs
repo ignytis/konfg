@@ -109,9 +109,7 @@ mod tests {
         args.insert("prefix".to_string(), format!("{}__MYAPP", ENV_VAR_PREFIX));
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: serde_json::Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         let obj = content.as_object().unwrap();

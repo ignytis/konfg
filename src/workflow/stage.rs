@@ -21,14 +21,17 @@ pub enum StageKind {
 }
 
 /// Execution context for a stage.
+#[derive(Default)]
 pub struct StageExecutionContext {
     pub current_config: Value,
+    pub stash: HashMap<String, Value>,
 }
 
 impl StageExecutionContext {
     pub fn new() -> Self {
         Self {
             current_config: Value::Object(Default::default()),
+            stash: HashMap::new(),
         }
     }
 }

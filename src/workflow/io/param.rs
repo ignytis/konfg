@@ -104,9 +104,7 @@ mod tests {
         args.insert("value".to_string(), "my_value".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"my_key": "my_value"}));
@@ -120,9 +118,7 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
@@ -145,9 +141,7 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
@@ -168,9 +162,7 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"a..b": "val"}));
@@ -184,9 +176,7 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(content, json!({"a.": "val"}));
@@ -200,9 +190,7 @@ mod tests {
         args.insert("value".to_string(), "val".to_string());
 
         let jinja = JinjaEngine::new();
-        let context = StageExecutionContext {
-            current_config: Value::Object(Default::default()),
-        };
+        let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
         assert_eq!(
