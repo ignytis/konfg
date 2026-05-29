@@ -1,0 +1,5 @@
+runtime:
+  location: London
+project:
+  domains:
+    cdn: static.eu.{{ project.domains.base }}

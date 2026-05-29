@@ -5,6 +5,9 @@ use serde_json::Value;
 
 use crate::{
     jinja::JinjaEngine,
+    utils::hashmap::{
+        hashmap_extract_nested_value, hashmap_insert_nested_value, hashmap_parse_key_parts,
+    },
     workflow::filters::{BaseFilter, Filter, TryParseFilterResult},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
@@ -57,8 +60,14 @@ impl BaseFilter for StashFilter {
         };
 
         let mut args = HashMap::new();
-        args.insert("mode".to_string(), mode);
+        args.insert("mode".to_string(), mode.clone());
         args.insert("key".to_string(), key);
+
+        if mode == "pop" {
+            if let Some(dest) = tokens.pop_front() {
+                args.insert("dest".to_string(), dest);
+            }
+        }
 
         TryParseFilterResult::Success(Stage::new(
             StageKind::Filter(Box::new(self.clone())),
@@ -97,7 +106,33 @@ impl Filter for StashFilter {
                     .stash
                     .remove(key)
                     .ok_or_else(|| anyhow!("stash filter: key '{}' does not exist", key))?;
-                context.current_config = value;
+                match args.get("dest") {
+                    None => context.current_config = value,
+                    Some(dest) => {
+                        let parts = hashmap_parse_key_parts(dest);
+                        let map = context
+                            .current_config
+                            .as_object()
+                            .ok_or_else(|| {
+                                anyhow!("stash filter: current_config is not an object")
+                            })?
+                            .clone();
+                        let (_, existing) = hashmap_extract_nested_value(map, &parts);
+                        if existing.is_some() {
+                            return Err(anyhow!(
+                                "stash filter: destination '{}' already exists",
+                                dest
+                            ));
+                        }
+                        let owned =
+                            match std::mem::replace(&mut context.current_config, Value::Null) {
+                                Value::Object(m) => m,
+                                _ => unreachable!(),
+                            };
+                        context.current_config =
+                            Value::Object(hashmap_insert_nested_value(owned, &parts, value));
+                    }
+                }
             }
             _ => return Err(anyhow!("stash filter: unknown mode '{}'", mode)),
         }
@@ -168,6 +203,43 @@ mod tests {
         let filter = StashFilter;
         let mut context = StageExecutionContext::new();
         let result = filter.apply(&make_args("pop", "missing"), &mut context);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pop_with_dest_inserts_into_current_config() {
+        let filter = StashFilter;
+        let mut context = StageExecutionContext::new();
+        context.current_config = json!({"a": 1});
+        filter
+            .apply(&make_args("push", "saved"), &mut context)
+            .unwrap();
+
+        context.current_config = json!({"x": 10});
+        let mut args = make_args("pop", "saved");
+        args.insert("dest".to_string(), "restored".to_string());
+        filter.apply(&args, &mut context).unwrap();
+
+        assert_eq!(
+            context.current_config,
+            json!({"x": 10, "restored": {"a": 1}})
+        );
+        assert!(!context.stash.contains_key("saved"));
+    }
+
+    #[test]
+    fn test_pop_with_dest_errors_if_dest_exists() {
+        let filter = StashFilter;
+        let mut context = StageExecutionContext::new();
+        context.current_config = json!({"a": 1});
+        filter
+            .apply(&make_args("push", "saved"), &mut context)
+            .unwrap();
+
+        context.current_config = json!({"restored": 99});
+        let mut args = make_args("pop", "saved");
+        args.insert("dest".to_string(), "restored".to_string());
+        let result = filter.apply(&args, &mut context);
         assert!(result.is_err());
     }
 }
