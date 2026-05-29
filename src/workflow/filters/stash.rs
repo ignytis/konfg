@@ -220,13 +220,15 @@ impl Filter for StashFilter {
                     None => context.current_config = value,
                     Some(dest) => {
                         let parts = hashmap_parse_key_parts(dest);
-                        let mut map = match std::mem::replace(&mut context.current_config, Value::Null) {
-                            Value::Object(m) => m,
-                            _ => serde_json::Map::new(),
-                        };
+                        let mut map =
+                            match std::mem::replace(&mut context.current_config, Value::Null) {
+                                Value::Object(m) => m,
+                                _ => serde_json::Map::new(),
+                            };
 
                         let (_, existing) = hashmap_extract_nested_value(map.clone(), &parts);
-                        let mut target_val = existing.unwrap_or(Value::Object(serde_json::Map::new()));
+                        let mut target_val =
+                            existing.unwrap_or(Value::Object(serde_json::Map::new()));
 
                         crate::utils::cfg_values::cfg_values_deep_merge(&mut target_val, &value)?;
                         map = hashmap_insert_nested_value(map, &parts, target_val);
@@ -387,7 +389,9 @@ mod tests {
     fn test_pop_flattens_values() {
         let filter = StashFilter;
         let mut context = StageExecutionContext::new();
-        context.stash.insert("saved".to_string(), json!({"values": {"a": 1}, "b": 2}));
+        context
+            .stash
+            .insert("saved".to_string(), json!({"values": {"a": 1}, "b": 2}));
 
         filter
             .apply(&make_args("pop", "saved"), &mut context)
