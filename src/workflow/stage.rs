@@ -108,7 +108,12 @@ impl Stage {
     ) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
             match io_handler.try_parse_args(&mut tokens, &jinja, false) {
-                TryParseResult::Success(s) => return Ok(s),
+                TryParseResult::Success(s) => {
+                    if !tokens.is_empty() {
+                        return Err(anyhow!("Unrecognized input tokens: {:?}", tokens));
+                    }
+                    return Ok(s);
+                }
                 TryParseResult::NotSupported => continue,
                 TryParseResult::Error(e) => return Err(e),
             }
@@ -126,7 +131,12 @@ impl Stage {
     ) -> Result<Stage> {
         for io_handler in REGISTERED_HANDLERS.iter() {
             match io_handler.try_parse_args(&mut tokens, &jinja, true) {
-                TryParseResult::Success(s) => return Ok(s),
+                TryParseResult::Success(s) => {
+                    if !tokens.is_empty() {
+                        return Err(anyhow!("Unrecognized output tokens: {:?}", tokens));
+                    }
+                    return Ok(s);
+                }
                 TryParseResult::NotSupported => continue,
                 TryParseResult::Error(e) => return Err(e),
             }
@@ -142,7 +152,12 @@ impl Stage {
     ) -> Result<Stage> {
         for filter_handler in REGISTERED_FILTERS.iter() {
             match filter_handler.try_parse_args(&mut tokens, &jinja) {
-                TryParseFilterResult::Success(s) => return Ok(s),
+                TryParseFilterResult::Success(s) => {
+                    if !tokens.is_empty() {
+                        return Err(anyhow!("Unrecognized filter tokens: {:?}", tokens));
+                    }
+                    return Ok(s);
+                }
                 TryParseFilterResult::NotSupported => continue,
                 TryParseFilterResult::Error(e) => return Err(e),
             }

@@ -3,3 +3,4 @@ runtime:
 project:
   domains:
     cdn: static.eu.{{ project.domains.base }}
+    awesome_website: {{ _imported_mixin.web_url }}
