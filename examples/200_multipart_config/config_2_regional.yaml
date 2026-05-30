@@ -4,3 +4,9 @@ project:
   domains:
     cdn: static.eu.{{ project.domains.base }}
     awesome_website: {{ _imported_mixin.web_url }}
+feature_flags:
+  my_bleeding_edge_feature: {{ _values.feature_flags.my_bleeding_edge_feature }}
+{% if _values.feature_flags.my_bleeding_edge_feature == '1' %}
+my_bleeding_edge_feature:
+  mode: some_value_here
+{% endif %}

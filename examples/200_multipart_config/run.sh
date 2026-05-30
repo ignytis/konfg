@@ -9,9 +9,14 @@ set -eu
 
 app_cmd="${APP_CMD:-cargo run --}"
 
+# This variable will be injected into config
+export MY_EXAMPLE__FEATURE_FLAGS__MY_BLEEDING_EDGE_FEATURE="${MY_EXAMPLE__FEATURE_FLAGS__MY_BLEEDING_EDGE_FEATURE:-1}"
+
 # The arguments are decomposed into multiple stages here - just to make commenting between stages possible
 # 1. Load values file (plain config. No Jinja templating)
 args="-i file ./examples/200_multipart_config/values.yaml"
+# 1a. Add some environment variables into values
+args="$args -i env MY_EXAMPLE"
 # 2. Save the processed config to stash with name 'values'. Do NOT clean the current config.
 args="$args -f stash push --preserve values"
 # 3. Move the contants of values file from root level into 'values' attribute

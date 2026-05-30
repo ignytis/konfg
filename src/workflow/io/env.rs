@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::env;
 
 use anyhow::Result;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::{
     jinja::JinjaEngine,
@@ -68,27 +68,30 @@ impl InputHandler for EnvHandler {
         _jinja: &JinjaEngine,
         _context: &StageExecutionContext,
     ) -> Result<Value> {
-        let mut res: Map<String, Value> = Map::new();
+        let mut props: HashMap<String, String> = HashMap::new();
         let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
 
         for (key, value) in env::vars() {
             if prefix.is_empty() {
-                res.insert(key, Value::String(value));
+                props.insert(key.to_lowercase(), value);
             } else {
                 let prefix_with_sep = format!("{}__", prefix);
                 if key.starts_with(&prefix_with_sep) {
                     let stripped_key = &key[prefix_with_sep.len()..];
-                    res.insert(String::from(stripped_key), Value::String(value));
+                    props.insert(stripped_key.to_lowercase(), value);
                 }
             }
         }
-        Ok(Value::Object(res.into()))
+        Ok(crate::utils::hashmap::hashmap_new_from_flat_hashmap(
+            props, "__",
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     // We want to minimize the chance of naming collision. So random prefix here
     const ENV_VAR_PREFIX: &str = "XLYZKXPFJH_KONFG_TESTS_HANDLERS_IO_ENV";
@@ -112,16 +115,14 @@ mod tests {
         let context = StageExecutionContext::default();
 
         let content = handler.read(&args, &jinja, &context).unwrap();
-        let obj = content.as_object().unwrap();
-
-        assert_eq!(obj.len(), 2);
         assert_eq!(
-            obj.get("DB__HOST").and_then(|v| v.as_str()).unwrap(),
-            "localhost"
-        );
-        assert_eq!(
-            obj.get("DB__PORT").and_then(|v| v.as_str()).unwrap(),
-            "5432"
+            content,
+            json!({
+                "db": {
+                    "host": "localhost",
+                    "port": "5432"
+                }
+            })
         );
     }
 

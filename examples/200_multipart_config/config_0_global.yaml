@@ -3,3 +3,5 @@ project:
   name: Example project
   domains:
     base: {{ _values.base_url }}
+feature_flags:
+  core: true
