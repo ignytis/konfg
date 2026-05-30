@@ -1,7 +1,9 @@
 pub mod env;
 pub mod file;
+pub mod file_common;
 pub mod param;
 pub mod stdio;
+pub mod tplfile;
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -20,6 +22,7 @@ pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn BaseIoHandler>>> = LazyLock:
     vec![
         Box::new(stdio::StdioHandler),
         Box::new(file::FileHandler),
+        Box::new(tplfile::TplFileHandler),
         Box::new(env::EnvHandler),
         Box::new(param::ParamHandler),
     ]

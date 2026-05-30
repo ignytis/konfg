@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs;
+use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use serde_json::Value;
@@ -11,13 +12,13 @@ use crate::{
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
-const KIND: &str = "file";
+const KIND: &str = "tplfile";
 
-/// Handles file input/output operations.
+/// Handles template file input/output operations (renders Jinja templates).
 #[derive(Clone)]
-pub struct FileHandler;
+pub struct TplFileHandler;
 
-impl BaseIoHandler for FileHandler {
+impl BaseIoHandler for TplFileHandler {
     fn supports(&self, kind: &str) -> bool {
         kind == KIND
     }
@@ -32,17 +33,24 @@ impl BaseIoHandler for FileHandler {
         jinja: &JinjaEngine,
         is_output: bool,
     ) -> TryParseResult {
-        // File handler requires explicit "file" keyword. Do not attempt to guess paths here.
-        match tokens.front().map(String::as_str) {
-            Some(KIND) => {
-                tokens.pop_front();
+        // tplfile supports guessing: if first token isn't the keyword, accept it as a path if it exists
+        let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
+            Some(KIND) => true,
+            Some(maybe_path) => {
+                if !Path::new(maybe_path).exists() {
+                    return TryParseResult::NotSupported;
+                }
+                false
             }
-            _ => return TryParseResult::NotSupported,
+            None => return TryParseResult::NotSupported,
+        };
+        if is_first_token_kind_keyword {
+            tokens.pop_front();
         }
 
         let path = match tokens.pop_front() {
             Some(v) => v,
-            None => return TryParseResult::Error(anyhow!("file: missing path")),
+            None => return TryParseResult::Error(anyhow!("tplfile: missing path")),
         };
 
         // Resolve format using shared helper
@@ -66,22 +74,23 @@ impl BaseIoHandler for FileHandler {
     }
 }
 
-impl InputHandler for FileHandler {
+impl InputHandler for TplFileHandler {
     fn read(
         &self,
         args: &HashMap<String, String>,
-        _jinja: &JinjaEngine,
-        _context: &StageExecutionContext,
+        jinja: &JinjaEngine,
+        context: &StageExecutionContext,
     ) -> Result<Value> {
         let path = args
             .get("path")
-            .ok_or_else(|| anyhow!("File handler: path is not specified"))?;
+            .ok_or_else(|| anyhow!("TplFile handler: path is not specified"))?;
         let raw = fs::read_to_string(path)?;
+        let rendered = jinja.render(&raw, &context.current_config)?;
 
         match args.get("format") {
             Some(f) => get_handler_for_format(f)
                 .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(&raw),
+                .parse(&rendered),
             None => Err(anyhow!(
                 "Inputs/outputs without defined formats are not supported"
             )),
@@ -89,7 +98,7 @@ impl InputHandler for FileHandler {
     }
 }
 
-impl OutputHandler for FileHandler {
+impl OutputHandler for TplFileHandler {
     fn write(
         &self,
         content: &str,
@@ -98,7 +107,7 @@ impl OutputHandler for FileHandler {
     ) -> Result<()> {
         let path = match args.get("path") {
             Some(p) => p,
-            None => return Err(anyhow!("File handler: path is not specified")),
+            None => return Err(anyhow!("TplFile handler: path is not specified")),
         };
         fs::write(path, content)?;
         Ok(())
@@ -110,10 +119,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_file_try_parse_args_input() {
-        let handler = FileHandler;
+    fn test_tplfile_try_parse_args_input() {
+        let handler = TplFileHandler;
         let mut tokens = VecDeque::from(vec![
-            KIND.to_string(),
+            "tplfile".to_string(),
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
         ]);
@@ -130,10 +139,10 @@ mod tests {
     }
 
     #[test]
-    fn test_file_try_parse_args_output() {
-        let handler = FileHandler;
+    fn test_tplfile_try_parse_args_output() {
+        let handler = TplFileHandler;
         let mut tokens = VecDeque::from(vec![
-            KIND.to_string(),
+            "tplfile".to_string(),
             "output.json".to_string(),
             "json".to_string(),
         ]);
@@ -150,9 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn test_file_supports() {
-        let handler = FileHandler;
-        assert!(handler.supports(KIND));
+    fn test_tplfile_supports() {
+        let handler = TplFileHandler;
+        assert!(handler.supports("tplfile"));
         assert!(!handler.supports("stdio"));
     }
 }

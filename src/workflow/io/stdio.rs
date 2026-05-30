@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_stdio_supports() {
         let handler = StdioHandler;
-        assert!(handler.supports("stdio"));
+        assert!(handler.supports(KIND));
         assert!(!handler.supports("file"));
     }
 }
