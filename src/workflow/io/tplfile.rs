@@ -1,15 +1,14 @@
-use std::collections::{HashMap, VecDeque};
-use std::fs;
-use std::path::Path;
+use std::collections::VecDeque;
 
-use anyhow::{Result, anyhow};
-use serde_json::Value;
+use anyhow::Result;
 
 use crate::{
-    file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
-    workflow::io::{BaseIoHandler, InputHandler, OutputHandler, TryParseResult},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::io::{
+        BaseIoHandler, TryParseResult,
+        file_common::{FileIoHandler, FilePreprocessor},
+    },
+    workflow::stage::StageExecutionContext,
 };
 
 const KIND: &str = "tplfile";
@@ -17,6 +16,17 @@ const KIND: &str = "tplfile";
 /// Handles template file input/output operations (renders Jinja templates).
 #[derive(Clone)]
 pub struct TplFileHandler;
+
+impl FilePreprocessor for TplFileHandler {
+    fn preprocess(
+        &self,
+        raw: &str,
+        jinja: &JinjaEngine,
+        context: &StageExecutionContext,
+    ) -> Result<String> {
+        jinja.render(raw, &context.current_config)
+    }
+}
 
 impl BaseIoHandler for TplFileHandler {
     fn supports(&self, kind: &str) -> bool {
@@ -33,89 +43,16 @@ impl BaseIoHandler for TplFileHandler {
         jinja: &JinjaEngine,
         is_output: bool,
     ) -> TryParseResult {
-        // tplfile supports guessing: if first token isn't the keyword, accept it as a path if it exists
-        let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
-            Some(KIND) => true,
-            Some(maybe_path) => {
-                if !Path::new(maybe_path).exists() {
-                    return TryParseResult::NotSupported;
-                }
-                false
-            }
-            None => return TryParseResult::NotSupported,
-        };
-        if is_first_token_kind_keyword {
-            tokens.pop_front();
-        }
-
-        let path = match tokens.pop_front() {
-            Some(v) => v,
-            None => return TryParseResult::Error(anyhow!("tplfile: missing path")),
-        };
-
-        // Resolve format using shared helper
-        let format_name =
-            match crate::workflow::io::file_common::resolve_format_from_tokens(&path, tokens) {
-                Ok(f) => f,
-                Err(e) => return TryParseResult::Error(e),
-            };
-
-        let mut args = HashMap::new();
-        args.insert("path".to_string(), path);
-        args.insert("format".to_string(), format_name);
-
-        let kind = if is_output {
-            StageKind::Output(Box::new(self.clone()))
-        } else {
-            StageKind::Input(Box::new(self.clone()))
-        };
-
-        TryParseResult::Success(Stage::new(kind, args, jinja.clone()))
-    }
-}
-
-impl InputHandler for TplFileHandler {
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        jinja: &JinjaEngine,
-        context: &StageExecutionContext,
-    ) -> Result<Value> {
-        let path = args
-            .get("path")
-            .ok_or_else(|| anyhow!("TplFile handler: path is not specified"))?;
-        let raw = fs::read_to_string(path)?;
-        let rendered = jinja.render(&raw, &context.current_config)?;
-
-        match args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(&rendered),
-            None => Err(anyhow!(
-                "Inputs/outputs without defined formats are not supported"
-            )),
-        }
-    }
-}
-
-impl OutputHandler for TplFileHandler {
-    fn write(
-        &self,
-        content: &str,
-        args: &HashMap<String, String>,
-        _context: &StageExecutionContext,
-    ) -> Result<()> {
-        let path = match args.get("path") {
-            Some(p) => p,
-            None => return Err(anyhow!("TplFile handler: path is not specified")),
-        };
-        fs::write(path, content)?;
-        Ok(())
+        FileIoHandler::new(KIND, self.clone()).try_parse(tokens, jinja, is_output, true)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
+    use crate::{jinja::JinjaEngine, workflow::io::TryParseResult, workflow::stage::StageKind};
+
     use super::*;
 
     #[test]

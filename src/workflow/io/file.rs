@@ -1,14 +1,11 @@
-use std::collections::{HashMap, VecDeque};
-use std::fs;
-
-use anyhow::{Result, anyhow};
-use serde_json::Value;
+use std::collections::VecDeque;
 
 use crate::{
-    file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
-    workflow::io::{BaseIoHandler, InputHandler, OutputHandler, TryParseResult},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::io::{
+        BaseIoHandler, TryParseResult,
+        file_common::{FileIoHandler, FilePreprocessor},
+    },
 };
 
 const KIND: &str = "file";
@@ -16,6 +13,8 @@ const KIND: &str = "file";
 /// Handles file input/output operations.
 #[derive(Clone)]
 pub struct FileHandler;
+
+impl FilePreprocessor for FileHandler {}
 
 impl BaseIoHandler for FileHandler {
     fn supports(&self, kind: &str) -> bool {
@@ -32,81 +31,16 @@ impl BaseIoHandler for FileHandler {
         jinja: &JinjaEngine,
         is_output: bool,
     ) -> TryParseResult {
-        // File handler requires explicit "file" keyword. Do not attempt to guess paths here.
-        match tokens.front().map(String::as_str) {
-            Some(KIND) => {
-                tokens.pop_front();
-            }
-            _ => return TryParseResult::NotSupported,
-        }
-
-        let path = match tokens.pop_front() {
-            Some(v) => v,
-            None => return TryParseResult::Error(anyhow!("file: missing path")),
-        };
-
-        // Resolve format using shared helper
-        let format_name =
-            match crate::workflow::io::file_common::resolve_format_from_tokens(&path, tokens) {
-                Ok(f) => f,
-                Err(e) => return TryParseResult::Error(e),
-            };
-
-        let mut args = HashMap::new();
-        args.insert("path".to_string(), path);
-        args.insert("format".to_string(), format_name);
-
-        let kind = if is_output {
-            StageKind::Output(Box::new(self.clone()))
-        } else {
-            StageKind::Input(Box::new(self.clone()))
-        };
-
-        TryParseResult::Success(Stage::new(kind, args, jinja.clone()))
-    }
-}
-
-impl InputHandler for FileHandler {
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        _jinja: &JinjaEngine,
-        _context: &StageExecutionContext,
-    ) -> Result<Value> {
-        let path = args
-            .get("path")
-            .ok_or_else(|| anyhow!("File handler: path is not specified"))?;
-        let raw = fs::read_to_string(path)?;
-
-        match args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(&raw),
-            None => Err(anyhow!(
-                "Inputs/outputs without defined formats are not supported"
-            )),
-        }
-    }
-}
-
-impl OutputHandler for FileHandler {
-    fn write(
-        &self,
-        content: &str,
-        args: &HashMap<String, String>,
-        _context: &StageExecutionContext,
-    ) -> Result<()> {
-        let path = match args.get("path") {
-            Some(p) => p,
-            None => return Err(anyhow!("File handler: path is not specified")),
-        };
-        fs::write(path, content)?;
-        Ok(())
+        FileIoHandler::new(KIND, self.clone()).try_parse(tokens, jinja, is_output, false)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
+
+    use crate::{jinja::JinjaEngine, workflow::io::TryParseResult, workflow::stage::StageKind};
+
     use super::*;
 
     #[test]
