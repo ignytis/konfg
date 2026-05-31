@@ -1,7 +1,6 @@
 mod cli;
-mod handlers;
+mod file_format_handlers;
 mod jinja;
-mod types;
 mod utils;
 mod workflow;
 

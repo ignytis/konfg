@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::handlers::format::FormatHandler;
+use crate::file_format_handlers::FormatHandler;
 use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
 const EXTENSION: &str = "properties";

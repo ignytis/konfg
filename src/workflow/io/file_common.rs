@@ -4,7 +4,7 @@ use std::path::Path;
 
 use anyhow::{Result, anyhow};
 
-use crate::handlers::format;
+use crate::file_format_handlers;
 
 /// Resolve format name either from next token (if it matches a format handler)
 /// or by guessing from file extension.
@@ -16,7 +16,7 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
     };
 
     // Try to get handler by next token
-    if let Some(h) = format::get_handler_for_format(next_token_maybe_format) {
+    if let Some(h) = file_format_handlers::get_handler_for_format(next_token_maybe_format) {
         // consume format token
         tokens.pop_front();
         return Ok(h.get_format_name().to_string());
@@ -28,7 +28,7 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
         .and_then(OsStr::to_str)
         .unwrap_or("");
 
-    match format::get_handler_for_file_extension(ext) {
+    match file_format_handlers::get_handler_for_file_extension(ext) {
         Ok(h) => Ok(h.get_format_name().to_string()),
         Err(_) => Err(anyhow!(
             "Failed to find the format handler using CLI arguments or file extension"

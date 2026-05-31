@@ -47,7 +47,7 @@ The project is structured into modular components:
 Example:
 ```rust
 use crate::{
-    handlers::format::{self, FormatHandler},
+    file_format_handlers::{self, FormatHandler},
     workflow::io::{self, IoHandler},
     types::format::Format,
 };

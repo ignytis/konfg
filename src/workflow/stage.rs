@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    handlers::format::get_handler_for_format,
+    file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
     workflow::{
         filters::{Filter, REGISTERED_FILTERS, TryParseFilterResult},

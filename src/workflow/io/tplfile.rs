@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    handlers::format::get_handler_for_format,
+    file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler, OutputHandler, TryParseResult},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
