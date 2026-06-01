@@ -19,7 +19,7 @@ The project is structured into modular components:
 
 - **`src/main.rs`:** Entry point, orchestrates the command execution.
 - **`src/cli/`:** CLI parsing (via `clap`) and command implementations (e.g., `build`).
-- **`src/handlers/format/`:** Implementations for parsing and serializing different configuration formats.
+- **`src/file_format_handlers/`:** Implementations for parsing and serializing different configuration formats.
 - **`src/workflow/io/`:** Handles reading from and writing to different targets (files, env, param, stdio).
 - **`src/workflow/filters/`:** Implements filters to modify the merged configuration.
 - **`src/workflow/`:** Workflow logic and the `Stage` structure.

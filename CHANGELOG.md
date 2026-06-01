@@ -1,5 +1,6 @@
-## 0.1.2 - 2026-05-25
+## 0.1.3 - 2026-06-01
 
-Introduced filters:
-- delete: deletes the specified configuration
-- move: moves the specified attribute to another property
+- Added a `cmd` input
+- Splitted the `file` input into:
+  - `file`: raw file I/O. No templating
+  - `tplfile`: templated file. Applies Jinja template. Original `file` behavior

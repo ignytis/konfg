@@ -1,3 +1,4 @@
+pub mod cmd;
 pub mod env;
 pub mod file;
 pub mod file_common;
@@ -21,6 +22,7 @@ use crate::{
 pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn BaseIoHandler>>> = LazyLock::new(|| {
     vec![
         Box::new(stdio::StdioHandler),
+        Box::new(cmd::CmdHandler),
         Box::new(file::FileHandler),
         Box::new(tplfile::TplFileHandler),
         Box::new(env::EnvHandler),

@@ -117,14 +117,17 @@ konfg build [options]
 ### Options
 
 - `-i`, `--input <args...>`: Input specification. Can be used multiple times.
-  - `stdio <format>`: Read from standard input as `<format>`.
-  - `file <path> <format>`: Read from `<path>` as `<format>`.
+  - `cmd <format> <cmd...>`: Execute a system command. Parse the output as `<format>`.
+  - `env <PREFIX>`: read environment variables. Double underscore `__` is separator.
+    Example: `MY_APP__TOP_LEVEL__SUB_LEVEL__MYVAR` will be processed is prefix is `MY_APP`
+  - `file <path> <format>`: Read from `<path>`, render as Jinja template and parse as `<format>`.
   - `file <path>`: Read from `<path>`, detecting format by extension.
   - `param <key> <value>`: inject a single parameter. Use dots `.` for nested levels.
      Use double dots `..` to escape the dots.
-  - `env <PREFIX>`: read environment variables. Double underscore `__` is separator.
-    Example: `MY_APP__TOP_LEVEL__SUB_LEVEL__MYVAR` will be processed is prefix is `MY_APP`
-  - `<path>`: Shorthand for `file <path>`.
+  - `stdio <format>`: Read from standard input as `<format>`.
+  - `tplfile <path> <format>`: Read from `<path>`, render as Jinja template and parse as `<format>`.
+  - `tplfile <path>`: Read from `<path>`, detecting format by extension.
+  - `<path>`: Shorthand for `tplfile <path>`.
 - `-o`, `--output <args...>`: Output specification. (Default: `stdio yaml`).
   - `stdio <format>`: Write to standard output as `<format>`.
   - `file <path> <format>`: Write to `<path>` as `<format>`.
