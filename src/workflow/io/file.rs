@@ -1,37 +1,64 @@
 use std::collections::VecDeque;
 
+use anyhow::{Result, anyhow};
+
 use crate::{
     jinja::JinjaEngine,
-    workflow::io::{
-        BaseIoHandler, TryParseResult,
-        file_common::{FileIoHandler, FilePreprocessor},
-    },
+    workflow::io::{BaseIoHandler, file_common::FilePreprocessor},
+    workflow::stage::{Stage, StageKind},
 };
 
-const KIND: &str = "file";
+pub const KIND: &str = "file";
 
 /// Handles file input/output operations.
 #[derive(Clone)]
-pub struct FileHandler;
+pub struct FileHandler {
+    pub path: String,
+    pub format: String,
+}
 
-impl FilePreprocessor for FileHandler {}
-
-impl BaseIoHandler for FileHandler {
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn BaseIoHandler> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(
-        &self,
-        tokens: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
+impl FileHandler {
+    pub fn new_from_args(
+        mut tokens: VecDeque<String>,
+        _jinja: &JinjaEngine,
         is_output: bool,
-    ) -> TryParseResult {
-        FileIoHandler::new(KIND, self.clone()).try_parse(tokens, jinja, is_output, false)
+    ) -> Result<Stage> {
+        if tokens.front().map(String::as_str) != Some(KIND) {
+            // Check if it's a path for guessing (though 'file' usually requires the keyword)
+            return Err(anyhow!("file handler: not supported"));
+        }
+
+        tokens.pop_front();
+
+        let path = match tokens.pop_front() {
+            Some(v) => v,
+            None => return Err(anyhow!("file: missing path")),
+        };
+
+        let format =
+            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut tokens)?;
+
+        let handler = FileHandler { path, format };
+
+        let kind = if is_output {
+            StageKind::Output(Box::new(handler))
+        } else {
+            StageKind::Input(Box::new(handler))
+        };
+
+        Ok(Stage::new(kind))
+    }
+}
+
+impl BaseIoHandler for FileHandler {}
+
+impl FilePreprocessor for FileHandler {
+    fn get_path(&self) -> &str {
+        &self.path
+    }
+
+    fn get_format(&self) -> &str {
+        &self.format
     }
 }
 
@@ -39,54 +66,38 @@ impl BaseIoHandler for FileHandler {
 mod tests {
     use std::collections::VecDeque;
 
-    use crate::{jinja::JinjaEngine, workflow::io::TryParseResult, workflow::stage::StageKind};
+    use crate::{jinja::JinjaEngine, workflow::stage::StageKind};
 
     use super::*;
 
     #[test]
     fn test_file_try_parse_args_input() {
-        let handler = FileHandler;
-        let mut tokens = VecDeque::from(vec![
+        let tokens = VecDeque::from(vec![
             KIND.to_string(),
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
         ]);
         let jinja = JinjaEngine::new();
 
-        let result = handler.try_parse_args(&mut tokens, &jinja, false);
-        if let TryParseResult::Success(stage) = result {
-            assert!(matches!(stage.kind, StageKind::Input(_)));
-            assert_eq!(stage.args.get("path").unwrap(), "non_existent_file.yaml");
-            assert_eq!(stage.args.get("format").unwrap(), "yaml");
-        } else {
-            panic!("Expected Success");
-        }
+        let stage = FileHandler::new_from_args(tokens, &jinja, false).unwrap();
+        assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_file_try_parse_args_output() {
-        let handler = FileHandler;
-        let mut tokens = VecDeque::from(vec![
+        let tokens = VecDeque::from(vec![
             KIND.to_string(),
             "output.json".to_string(),
             "json".to_string(),
         ]);
         let jinja = JinjaEngine::new();
 
-        let result = handler.try_parse_args(&mut tokens, &jinja, true);
-        if let TryParseResult::Success(stage) = result {
-            assert!(matches!(stage.kind, StageKind::Output(_)));
-            assert_eq!(stage.args.get("path").unwrap(), "output.json");
-            assert_eq!(stage.args.get("format").unwrap(), "json");
-        } else {
-            panic!("Expected Success");
-        }
+        let stage = FileHandler::new_from_args(tokens, &jinja, true).unwrap();
+        assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 
     #[test]
     fn test_file_supports() {
-        let handler = FileHandler;
-        assert!(handler.supports(KIND));
-        assert!(!handler.supports("stdio"));
+        assert_eq!(KIND, "file");
     }
 }

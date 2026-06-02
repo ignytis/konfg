@@ -6,39 +6,32 @@ use serde_json::Value;
 
 use crate::{
     jinja::JinjaEngine,
-    workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
+    workflow::io::{BaseIoHandler, InputHandler},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
-const KIND: &str = "env";
+pub const KIND: &str = "env";
 
 /// Handles environment variable input operations.
 /// NB! This handler converts the input into dotenv format.
 ///     Nesting is actually handler by dotenv format handler.
 #[derive(Clone)]
-pub struct EnvHandler;
+pub struct EnvHandler {
+    pub prefix: Option<String>,
+}
 
-impl BaseIoHandler for EnvHandler {
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn BaseIoHandler> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(
-        &self,
-        tokens: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
+impl EnvHandler {
+    pub fn new_from_args(
+        mut tokens: VecDeque<String>,
+        _jinja: &JinjaEngine,
         is_output: bool,
-    ) -> TryParseResult {
+    ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
-            return TryParseResult::NotSupported;
+            return Err(anyhow::anyhow!("env handler: not supported"));
         }
 
         if is_output {
-            return TryParseResult::Error(anyhow::anyhow!(
+            return Err(anyhow::anyhow!(
                 "Environment handler: writing to environment variables is not supported"
             ));
         }
@@ -47,29 +40,18 @@ impl BaseIoHandler for EnvHandler {
 
         let prefix = tokens.pop_front();
 
-        let mut args = HashMap::new();
-        if let Some(p) = prefix {
-            args.insert("prefix".to_string(), p);
-        }
-        args.insert("format".to_string(), "dotenv".to_string());
-
-        TryParseResult::Success(Stage::new(
-            StageKind::Input(Box::new(self.clone())),
-            args,
-            jinja.clone(),
-        ))
+        Ok(Stage::new(StageKind::Input(Box::new(EnvHandler {
+            prefix,
+        }))))
     }
 }
 
+impl BaseIoHandler for EnvHandler {}
+
 impl InputHandler for EnvHandler {
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        _jinja: &JinjaEngine,
-        _context: &StageExecutionContext,
-    ) -> Result<Value> {
+    fn read(&self, _context: &StageExecutionContext) -> Result<Value> {
         let mut props: HashMap<String, String> = HashMap::new();
-        let prefix = args.get("prefix").map(|s| s.as_str()).unwrap_or("");
+        let prefix = self.prefix.as_deref().unwrap_or("");
 
         for (key, value) in env::vars() {
             if prefix.is_empty() {
@@ -107,14 +89,13 @@ mod tests {
             env::set_var(&var_other, "value");
         }
 
-        let handler = EnvHandler;
-        let mut args = HashMap::new();
-        args.insert("prefix".to_string(), format!("{}__MYAPP", ENV_VAR_PREFIX));
+        let handler = EnvHandler {
+            prefix: Some(format!("{}__MYAPP", ENV_VAR_PREFIX)),
+        };
 
-        let jinja = JinjaEngine::new();
         let context = StageExecutionContext::default();
 
-        let content = handler.read(&args, &jinja, &context).unwrap();
+        let content = handler.read(&context).unwrap();
         assert_eq!(
             content,
             json!({
@@ -128,12 +109,11 @@ mod tests {
 
     #[test]
     fn test_env_try_parse_args_output_error() {
-        let handler = EnvHandler;
-        let mut tokens = VecDeque::from(vec!["env".to_string()]);
+        let tokens = VecDeque::from(vec!["env".to_string()]);
         let jinja = JinjaEngine::new();
-        let result = handler.try_parse_args(&mut tokens, &jinja, true);
-        assert!(matches!(result, TryParseResult::Error(_)));
-        if let TryParseResult::Error(e) = result {
+        let result = EnvHandler::new_from_args(tokens, &jinja, true);
+        assert!(result.is_err());
+        if let Err(e) = result {
             assert_eq!(
                 e.to_string(),
                 "Environment handler: writing to environment variables is not supported"
@@ -143,8 +123,6 @@ mod tests {
 
     #[test]
     fn test_env_supports() {
-        let handler = EnvHandler;
-        assert!(handler.supports("env"));
-        assert!(!handler.supports("stdio"));
+        assert_eq!(KIND, "env");
     }
 }

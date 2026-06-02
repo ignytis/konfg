@@ -3,21 +3,20 @@ use serde_json::Value;
 
 use crate::file_format_handlers::FormatHandler;
 
-const EXTENSION: &str = "toml";
+pub const KIND: &str = "toml";
+pub const EXTENSIONS: &[&str] = &["toml"];
 
 /// A handler for managing TOML configuration files.
 #[derive(Clone)]
 pub struct TomlHandler;
 
+impl TomlHandler {
+    pub fn create() -> Box<dyn FormatHandler> {
+        Box::new(TomlHandler)
+    }
+}
+
 impl FormatHandler for TomlHandler {
-    fn get_format_name(&self) -> &'static str {
-        EXTENSION
-    }
-
-    fn get_file_extensions(&self) -> Vec<&'static str> {
-        vec![EXTENSION]
-    }
-
     fn parse(&self, content: &str) -> Result<Value> {
         let toml_val: toml::Value = toml::from_str(content)?;
         Ok(serde_json::to_value(toml_val)?)
@@ -26,10 +25,6 @@ impl FormatHandler for TomlHandler {
     fn serialize(&self, value: &Value) -> Result<String> {
         let tv: toml::Value = serde_json::from_value(value.clone())?;
         Ok(toml::to_string_pretty(&tv)?)
-    }
-
-    fn clone_box(&self) -> Box<dyn FormatHandler> {
-        Box::new(self.clone())
     }
 }
 
@@ -58,8 +53,6 @@ a = 1"#;
 
     #[test]
     fn test_toml_supports() {
-        let handler = TomlHandler;
-        assert!(handler.supports("toml"));
-        assert!(!handler.supports("json"));
+        assert_eq!(KIND, "toml");
     }
 }

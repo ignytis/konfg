@@ -8,9 +8,7 @@ use crate::{
     jinja::JinjaEngine,
     workflow::{
         filters::{Filter, REGISTERED_FILTERS},
-        io::{
-            InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult, stdio::StdioHandler,
-        },
+        io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, stdio::StdioHandler},
     },
 };
 
@@ -39,27 +37,22 @@ impl StageExecutionContext {
 /// Represents a configuration source or destination with associated IO and format handlers.
 pub struct Stage {
     pub kind: StageKind,
-    pub args: HashMap<String, String>,
-    pub jinja_engine: JinjaEngine,
 }
 
 /// A definition of stage parser function
 pub type StageParserFn = fn(VecDeque<String>, &JinjaEngine) -> Result<Stage>;
 
 impl Stage {
-    pub fn new(kind: StageKind, args: HashMap<String, String>, jinja_engine: JinjaEngine) -> Self {
-        Self {
-            kind,
-            args,
-            jinja_engine,
-        }
+    pub fn new(kind: StageKind) -> Self {
+        Self { kind }
     }
 
     pub fn new_output_default() -> Self {
         Stage {
-            kind: StageKind::Output(Box::new(StdioHandler {})),
-            args: HashMap::default(),
-            jinja_engine: JinjaEngine::new(),
+            kind: StageKind::Output(Box::new(StdioHandler {
+                format: "json".to_string(),
+                jinja: JinjaEngine::new(),
+            })),
         }
     }
 
@@ -73,23 +66,18 @@ impl Stage {
         matches!(self.kind, StageKind::Output(_))
     }
 
-    /// Returns true if the stage is a filter stage.
-    pub fn is_filter(&self) -> bool {
-        matches!(self.kind, StageKind::Filter(_))
-    }
-
     /// Executes the stage: reads content for input stages, writes content for output stages, or applies filter for filter stages.
     pub fn run(&self, context: &mut StageExecutionContext) -> Result<Value> {
         match &self.kind {
-            StageKind::Input(handler) => handler.read(&self.args, &self.jinja_engine, context),
+            StageKind::Input(handler) => handler.read(context),
             StageKind::Output(handler) => {
-                let serialized_value = match self.args.get("format") {
-                    Some(f) => get_handler_for_format(f)
+                let serialized_value = match handler.get_format() {
+                    Some(f) => get_handler_for_format(&f)
                         .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
                         .serialize(&context.current_config)?,
                     None => context.current_config.to_string(),
                 };
-                handler.write(&serialized_value, &self.args, context)?;
+                handler.write(&serialized_value, context)?;
                 Ok(Value::Null)
             }
             StageKind::Filter(handler) => {
@@ -102,20 +90,28 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single input.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_input(
-        mut tokens: VecDeque<String>,
-        jinja: &JinjaEngine,
-    ) -> Result<Stage> {
-        for io_handler in REGISTERED_HANDLERS.iter() {
-            match io_handler.try_parse_args(&mut tokens, &jinja, false) {
-                TryParseResult::Success(s) => {
-                    if !tokens.is_empty() {
-                        return Err(anyhow!("Unrecognized input tokens: {:?}", tokens));
-                    }
-                    return Ok(s);
+    pub fn try_from_strings_input(tokens: VecDeque<String>, jinja: &JinjaEngine) -> Result<Stage> {
+        let id = match tokens.front().map(String::as_str) {
+            Some(i) => i,
+            None => return Err(anyhow!("Missing input id")),
+        };
+
+        for (it_id, it_creator_fn) in REGISTERED_HANDLERS.iter() {
+            if !id.eq(*it_id) {
+                // Specialized handlers like tplfile can guess by path, so we don't always match by ID
+                // But for standard handlers we do.
+                // Wait, tplfile/file use FileIoHandler which checks if first token is kind keyword OR if it's a path.
+                // So we should try every handler if it doesn't match by ID but supports "guessing".
+                // Actually, let's keep it simple: if it doesn't match ID, we only try it if it's one of the "guessing" handlers.
+                if *it_id != "tplfile" && *it_id != "file" {
+                    continue;
                 }
-                TryParseResult::NotSupported => continue,
-                TryParseResult::Error(e) => return Err(e),
+            }
+
+            match it_creator_fn(tokens.clone(), jinja, false) {
+                Ok(s) => return Ok(s),
+                Err(_) if !id.eq(*it_id) => continue, // If we were guessing, ignore error and try next
+                Err(e) => return Err(e),
             }
         }
 
@@ -125,30 +121,33 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single output.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_output(
-        mut tokens: VecDeque<String>,
-        jinja: &JinjaEngine,
-    ) -> Result<Stage> {
-        for io_handler in REGISTERED_HANDLERS.iter() {
-            match io_handler.try_parse_args(&mut tokens, &jinja, true) {
-                TryParseResult::Success(s) => {
-                    if !tokens.is_empty() {
-                        return Err(anyhow!("Unrecognized output tokens: {:?}", tokens));
-                    }
-                    return Ok(s);
+    pub fn try_from_strings_output(tokens: VecDeque<String>, jinja: &JinjaEngine) -> Result<Stage> {
+        let id = match tokens.front().map(String::as_str) {
+            Some(i) => i,
+            None => return Err(anyhow!("Missing output id")),
+        };
+
+        for (it_id, it_creator_fn) in REGISTERED_HANDLERS.iter() {
+            if !id.eq(*it_id) {
+                if *it_id != "tplfile" && *it_id != "file" {
+                    continue;
                 }
-                TryParseResult::NotSupported => continue,
-                TryParseResult::Error(e) => return Err(e),
+            }
+
+            match it_creator_fn(tokens.clone(), jinja, true) {
+                Ok(s) => return Ok(s),
+                Err(_) if !id.eq(*it_id) => continue,
+                Err(e) => return Err(e),
             }
         }
 
-        return Err(anyhow!("Unrecognized input argument: {:?}", tokens));
+        return Err(anyhow!("Unrecognized output argument: {:?}", tokens));
     }
 
     /// Parses a flat list of arguments into a `Stage` using registered filter handlers.
     pub fn try_from_strings_filter(
         mut tokens: VecDeque<String>,
-        jinja: &JinjaEngine,
+        _jinja: &JinjaEngine,
     ) -> Result<Stage> {
         let id = match tokens.pop_front() {
             Some(i) => i,
@@ -163,8 +162,6 @@ impl Stage {
             let handler = it_creator_fn(tokens)?;
             return Ok(Stage {
                 kind: StageKind::Filter(handler),
-                args: HashMap::default(),
-                jinja_engine: jinja.clone(),
             });
         }
 

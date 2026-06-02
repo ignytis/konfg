@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::process::Command;
 
 use anyhow::{Result, anyhow};
@@ -7,37 +7,31 @@ use serde_json::Value;
 use crate::{
     file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
-    workflow::io::{BaseIoHandler, InputHandler, TryParseResult},
+    workflow::io::{BaseIoHandler, InputHandler},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
-const KIND: &str = "cmd";
+pub const KIND: &str = "cmd";
 
 /// Handles command execution input operations.
 #[derive(Clone)]
-pub struct CmdHandler;
+pub struct CmdHandler {
+    pub command: String,
+    pub format: String,
+}
 
-impl BaseIoHandler for CmdHandler {
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn BaseIoHandler> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(
-        &self,
-        tokens: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
+impl CmdHandler {
+    pub fn new_from_args(
+        mut tokens: VecDeque<String>,
+        _jinja: &JinjaEngine,
         is_output: bool,
-    ) -> TryParseResult {
+    ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
-            return TryParseResult::NotSupported;
+            return Err(anyhow!("cmd handler: not supported"));
         }
 
         if is_output {
-            return TryParseResult::Error(anyhow!(
+            return Err(anyhow!(
                 "Command handler: writing to command is not supported"
             ));
         }
@@ -46,7 +40,7 @@ impl BaseIoHandler for CmdHandler {
 
         let format = match tokens.pop_front() {
             Some(v) => v,
-            None => return TryParseResult::Error(anyhow!("cmd: missing format")),
+            None => return Err(anyhow!("cmd: missing format")),
         };
         let command = tokens
             .iter()
@@ -55,28 +49,18 @@ impl BaseIoHandler for CmdHandler {
             .join(" ");
         tokens.clear();
 
-        let mut args = HashMap::new();
-        args.insert("command".to_string(), command);
-        args.insert("format".to_string(), format);
-
-        TryParseResult::Success(Stage::new(
-            StageKind::Input(Box::new(self.clone())),
-            args,
-            jinja.clone(),
-        ))
+        Ok(Stage::new(StageKind::Input(Box::new(CmdHandler {
+            command,
+            format,
+        }))))
     }
 }
 
+impl BaseIoHandler for CmdHandler {}
+
 impl InputHandler for CmdHandler {
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        _jinja: &JinjaEngine,
-        _context: &StageExecutionContext,
-    ) -> Result<Value> {
-        let command_str = args
-            .get("command")
-            .ok_or_else(|| anyhow!("Command handler: command is not specified"))?;
+    fn read(&self, _context: &StageExecutionContext) -> Result<Value> {
+        let command_str = &self.command;
 
         #[cfg(windows)]
         let mut cmd = Command::new("cmd");
@@ -101,14 +85,9 @@ impl InputHandler for CmdHandler {
 
         let stdout = String::from_utf8(output.stdout)?;
 
-        match args.get("format") {
-            Some(f) => get_handler_for_format(f)
-                .ok_or_else(|| anyhow!("Format handler not found for: {}", f))?
-                .parse(&stdout),
-            None => Err(anyhow!(
-                "Inputs/outputs without defined formats are not supported"
-            )),
-        }
+        get_handler_for_format(&self.format)
+            .ok_or_else(|| anyhow!("Format handler not found for: {}", self.format))?
+            .parse(&stdout)
     }
 }
 
@@ -119,63 +98,53 @@ mod tests {
 
     #[test]
     fn test_cmd_read_echo_json() {
-        let handler = CmdHandler;
-        let mut args = HashMap::new();
-        #[cfg(not(windows))]
-        args.insert(
-            "command".to_string(),
-            "echo '{\"foo\": \"bar\"}'".to_string(),
-        );
-        #[cfg(windows)]
-        args.insert("command".to_string(), "echo {\"foo\": \"bar\"}".to_string());
+        let handler = CmdHandler {
+            command: if cfg!(windows) {
+                "echo {\"foo\": \"bar\"}".to_string()
+            } else {
+                "echo '{\"foo\": \"bar\"}'".to_string()
+            },
+            format: "json".to_string(),
+        };
 
-        args.insert("format".to_string(), "json".to_string());
-
-        let jinja = JinjaEngine::new();
         let context = StageExecutionContext::default();
 
-        let content = handler.read(&args, &jinja, &context).unwrap();
+        let content = handler.read(&context).unwrap();
         assert_eq!(content, json!({"foo": "bar"}));
     }
 
     #[test]
     fn test_cmd_read_fail() {
-        let handler = CmdHandler;
-        let mut args = HashMap::new();
-        args.insert("command".to_string(), "false".to_string());
-        args.insert("format".to_string(), "json".to_string());
+        let handler = CmdHandler {
+            command: "false".to_string(),
+            format: "json".to_string(),
+        };
 
-        let jinja = JinjaEngine::new();
         let context = StageExecutionContext::default();
 
-        let result = handler.read(&args, &jinja, &context);
+        let result = handler.read(&context);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_cmd_supports() {
-        let handler = CmdHandler;
-        assert!(handler.supports(KIND));
-        assert!(!handler.supports("stdio"));
+        assert_eq!(KIND, "cmd");
     }
 
     #[test]
     fn test_cmd_try_parse_args() {
-        let handler = CmdHandler;
-        let mut tokens = VecDeque::from(vec![
+        let tokens = VecDeque::from(vec![
             "cmd".to_string(),
             "json".to_string(),
             "ls".to_string(),
         ]);
         let jinja = JinjaEngine::new();
 
-        let result = handler.try_parse_args(&mut tokens, &jinja, false);
-        if let TryParseResult::Success(stage) = result {
-            assert_eq!(stage.args.get("command").unwrap(), "ls");
-            assert_eq!(stage.args.get("format").unwrap(), "json");
+        let stage = CmdHandler::new_from_args(tokens, &jinja, false).unwrap();
+        if let StageKind::Input(_) = stage.kind {
+            // ok
         } else {
-            panic!("Expected Success");
+            panic!("Expected Input kind");
         }
-        assert!(tokens.is_empty());
     }
 }

@@ -6,19 +6,20 @@ use crate::{
     utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap},
 };
 
+pub const KIND: &str = "dotenv";
+pub const EXTENSIONS: &[&str] = &["env"];
+
 /// A handler for managing `.env` configuration files.
 #[derive(Clone)]
 pub struct DotenvHandler;
 
+impl DotenvHandler {
+    pub fn create() -> Box<dyn FormatHandler> {
+        Box::new(DotenvHandler)
+    }
+}
+
 impl FormatHandler for DotenvHandler {
-    fn get_format_name(&self) -> &'static str {
-        "dotenv"
-    }
-
-    fn get_file_extensions(&self) -> Vec<&'static str> {
-        vec!["env"]
-    }
-
     fn parse(&self, content: &str) -> Result<Value> {
         let iter = dotenvy::Iter::new(content.as_bytes());
         let mut props = std::collections::HashMap::new();
@@ -36,10 +37,6 @@ impl FormatHandler for DotenvHandler {
             res.push_str(&format!("{}={}\n", k, v));
         }
         Ok(res)
-    }
-
-    fn clone_box(&self) -> Box<dyn FormatHandler> {
-        Box::new(self.clone())
     }
 }
 
@@ -82,8 +79,7 @@ mod tests {
 
     #[test]
     fn test_dotenv_supports() {
-        let handler = DotenvHandler;
-        assert!(handler.supports("dotenv"));
-        assert!(!handler.supports("json"));
+        // supports method is moved to mod.rs or handled by registry
+        assert_eq!(KIND, "dotenv");
     }
 }

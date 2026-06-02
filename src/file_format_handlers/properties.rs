@@ -4,21 +4,20 @@ use serde_json::Value;
 use crate::file_format_handlers::FormatHandler;
 use crate::utils::hashmap::{hashmap_flatten, hashmap_new_from_flat_hashmap};
 
-const EXTENSION: &str = "properties";
+pub const KIND: &str = "properties";
+pub const EXTENSIONS: &[&str] = &["properties"];
 
 /// A handler for managing Java properties configuration files.
 #[derive(Clone)]
 pub struct PropertiesHandler;
 
+impl PropertiesHandler {
+    pub fn create() -> Box<dyn FormatHandler> {
+        Box::new(PropertiesHandler)
+    }
+}
+
 impl FormatHandler for PropertiesHandler {
-    fn get_format_name(&self) -> &'static str {
-        EXTENSION
-    }
-
-    fn get_file_extensions(&self) -> Vec<&'static str> {
-        vec![EXTENSION]
-    }
-
     fn parse(&self, content: &str) -> Result<Value> {
         let props = java_properties::read(content.as_bytes())?;
         Ok(hashmap_new_from_flat_hashmap(props, "."))
@@ -29,14 +28,6 @@ impl FormatHandler for PropertiesHandler {
         let mut buf = Vec::new();
         java_properties::write(&mut buf, &map)?;
         Ok(String::from_utf8(buf)?)
-    }
-
-    fn supports(&self, format: &str) -> bool {
-        format == "properties"
-    }
-
-    fn clone_box(&self) -> Box<dyn FormatHandler> {
-        Box::new(self.clone())
     }
 }
 
@@ -80,8 +71,6 @@ mod tests {
 
     #[test]
     fn test_properties_supports() {
-        let handler = PropertiesHandler;
-        assert!(handler.supports("properties"));
-        assert!(!handler.supports("json"));
+        assert_eq!(KIND, "properties");
     }
 }

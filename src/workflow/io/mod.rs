@@ -6,10 +6,7 @@ pub mod param;
 pub mod stdio;
 pub mod tplfile;
 
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::LazyLock,
-};
+use std::{collections::VecDeque, sync::LazyLock};
 
 use anyhow::Result;
 use serde_json::Value;
@@ -19,69 +16,34 @@ use crate::{
     workflow::stage::{Stage, StageExecutionContext},
 };
 
-pub const REGISTERED_HANDLERS: LazyLock<Vec<Box<dyn BaseIoHandler>>> = LazyLock::new(|| {
-    vec![
-        Box::new(stdio::StdioHandler),
-        Box::new(cmd::CmdHandler),
-        Box::new(file::FileHandler),
-        Box::new(tplfile::TplFileHandler),
-        Box::new(env::EnvHandler),
-        Box::new(param::ParamHandler),
-    ]
-});
+pub type IoHandlerCreatorFn = fn(VecDeque<String>, &JinjaEngine, bool) -> Result<Stage>;
 
-/// Result of attempting to parse tokens by a handler.
-pub enum TryParseResult {
-    /// Arguments were successfully parsed into Stage
-    Success(Stage),
-    /// Parser does not support the provided input
-    NotSupported,
-    /// Parser supports the provided input, but an error occurred
-    Error(anyhow::Error),
-}
+pub const REGISTERED_HANDLERS: LazyLock<Vec<(&'static str, IoHandlerCreatorFn)>> =
+    LazyLock::new(|| {
+        vec![
+            (stdio::KIND, stdio::StdioHandler::new_from_args),
+            (cmd::KIND, cmd::CmdHandler::new_from_args),
+            (file::KIND, file::FileHandler::new_from_args),
+            (tplfile::KIND, tplfile::TplFileHandler::new_from_args),
+            (env::KIND, env::EnvHandler::new_from_args),
+            (param::KIND, param::ParamHandler::new_from_args),
+        ]
+    });
 
 /// Base trait for handling input/output operations.
-pub trait BaseIoHandler: Send + Sync {
-    /// Checks if this handler supports the given kind, e.g. "file" or "stdio".
-    fn supports(&self, kind: &str) -> bool;
-
-    /// Clones the handler into a boxed trait object.
-    fn clone_box(&self) -> Box<dyn BaseIoHandler>;
-
-    /// Attempts to pop args and construct a `Stage`.
-    /// Returns `TryParseResult::NotSupported` if the first token is not supported by this handler.
-    fn try_parse_args(
-        &self,
-        args: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
-        is_output: bool,
-    ) -> TryParseResult;
-}
+pub trait BaseIoHandler: Send + Sync {}
 
 /// Trait for handling input operations.
 pub trait InputHandler: BaseIoHandler {
     /// Reads content from the source, rendering it as Jinja template if supported.
-    fn read(
-        &self,
-        args: &HashMap<String, String>,
-        jinja: &JinjaEngine,
-        context: &StageExecutionContext,
-    ) -> Result<Value>;
+    fn read(&self, context: &StageExecutionContext) -> Result<Value>;
 }
 
 /// Trait for handling output operations.
 pub trait OutputHandler: BaseIoHandler {
     /// Writes serialized content to the destination.
-    fn write(
-        &self,
-        content: &str,
-        args: &HashMap<String, String>,
-        context: &StageExecutionContext,
-    ) -> Result<()>;
-}
+    fn write(&self, content: &str, context: &StageExecutionContext) -> Result<()>;
 
-impl Clone for Box<dyn BaseIoHandler> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
+    /// Returns the format name for this output handler.
+    fn get_format(&self) -> Option<String>;
 }

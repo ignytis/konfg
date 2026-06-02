@@ -3,29 +3,26 @@ use serde_json::Value;
 
 use crate::file_format_handlers::FormatHandler;
 
+pub const KIND: &str = "yaml";
+pub const EXTENSIONS: &[&str] = &["yml", "yaml"];
+
 /// A handler for managing YAML configuration files.
 #[derive(Clone)]
 pub struct YamlHandler;
 
+impl YamlHandler {
+    pub fn create() -> Box<dyn FormatHandler> {
+        Box::new(YamlHandler)
+    }
+}
+
 impl FormatHandler for YamlHandler {
-    fn get_format_name(&self) -> &'static str {
-        "yaml"
-    }
-
-    fn get_file_extensions(&self) -> Vec<&'static str> {
-        vec!["yml", "yaml"]
-    }
-
     fn parse(&self, content: &str) -> Result<Value> {
         Ok(serde_yaml::from_str(content)?)
     }
 
     fn serialize(&self, value: &Value) -> Result<String> {
         Ok(serde_yaml::to_string(value)?)
-    }
-
-    fn clone_box(&self) -> Box<dyn FormatHandler> {
-        Box::new(self.clone())
     }
 }
 
@@ -52,8 +49,6 @@ mod tests {
 
     #[test]
     fn test_yaml_supports() {
-        let handler = YamlHandler;
-        assert!(handler.supports("yaml"));
-        assert!(!handler.supports("json"));
+        assert_eq!(KIND, "yaml");
     }
 }
