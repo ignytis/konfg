@@ -7,7 +7,7 @@ use crate::{
     file_format_handlers::get_handler_for_format,
     jinja::JinjaEngine,
     workflow::{
-        filters::{Filter, REGISTERED_FILTERS, TryParseFilterResult},
+        filters::{Filter, REGISTERED_FILTERS},
         io::{
             InputHandler, OutputHandler, REGISTERED_HANDLERS, TryParseResult, stdio::StdioHandler,
         },
@@ -93,7 +93,7 @@ impl Stage {
                 Ok(Value::Null)
             }
             StageKind::Filter(handler) => {
-                handler.apply(&self.args, context)?;
+                handler.apply(context)?;
                 Ok(Value::Null)
             }
         }
@@ -150,17 +150,22 @@ impl Stage {
         mut tokens: VecDeque<String>,
         jinja: &JinjaEngine,
     ) -> Result<Stage> {
-        for filter_handler in REGISTERED_FILTERS.iter() {
-            match filter_handler.try_parse_args(&mut tokens, &jinja) {
-                TryParseFilterResult::Success(s) => {
-                    if !tokens.is_empty() {
-                        return Err(anyhow!("Unrecognized filter tokens: {:?}", tokens));
-                    }
-                    return Ok(s);
-                }
-                TryParseFilterResult::NotSupported => continue,
-                TryParseFilterResult::Error(e) => return Err(e),
+        let id = match tokens.pop_front() {
+            Some(i) => i,
+            None => return Err(anyhow!("Missing filter id")),
+        };
+        
+        for (it_id, it_creator_fn) in REGISTERED_FILTERS.iter() {
+            if !id.eq(it_id) {
+                continue
             }
+
+            let handler = it_creator_fn(tokens)?;
+            return Ok(Stage {
+                kind: StageKind::Filter(handler),
+                args: HashMap::default(),
+                jinja_engine: jinja.clone(),
+            });
         }
 
         return Err(anyhow!("Unrecognized filter argument: {:?}", tokens));
