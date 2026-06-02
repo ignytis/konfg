@@ -98,14 +98,7 @@ impl Stage {
 
         for (it_id, it_creator_fn) in REGISTERED_HANDLERS.iter() {
             if !id.eq(*it_id) {
-                // Specialized handlers like tplfile can guess by path, so we don't always match by ID
-                // But for standard handlers we do.
-                // Wait, tplfile/file use FileIoHandler which checks if first token is kind keyword OR if it's a path.
-                // So we should try every handler if it doesn't match by ID but supports "guessing".
-                // Actually, let's keep it simple: if it doesn't match ID, we only try it if it's one of the "guessing" handlers.
-                if *it_id != "tplfile" && *it_id != "file" {
-                    continue;
-                }
+                continue;
             }
 
             match it_creator_fn(tokens.clone(), jinja, false) {

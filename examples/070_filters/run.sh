@@ -11,9 +11,9 @@ set -eu
 app_cmd="${APP_CMD:-cargo run --}"
 
 ${app_cmd} build \
-  -i $PWD/examples/070_filters/globals.yaml \
+  -i tplfile $PWD/examples/070_filters/globals.yaml \
   -f move . _globals \
-  -i $PWD/examples/070_filters/config.yaml \
+  -i tplfile $PWD/examples/070_filters/config.yaml \
   -f delete user.password \
   -f delete _globals \
   -o stdio json

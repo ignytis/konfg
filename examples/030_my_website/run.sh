@@ -19,9 +19,9 @@
 set -eu
 
 args="\
-    -i $PWD/examples/030_my_website/0_base.properties \
-    -i $PWD/examples/030_my_website/1_backend.yaml \
-    -i $PWD/examples/030_my_website/2_frontend.yaml \
+    -i tplfile $PWD/examples/030_my_website/0_base.properties \
+    -i tplfile $PWD/examples/030_my_website/1_backend.yaml \
+    -i tplfile $PWD/examples/030_my_website/2_frontend.yaml \
 "
 
 app_cmd="${APP_CMD:-cargo run --}"

@@ -1,3 +1,9 @@
 #!/usr/bin/env bash
 
-find examples -name 'run.sh' -exec bash {} \;
+set -euo pipefail
+
+find examples -name 'run.sh' | while read script
+do
+    echo "Running $script..."
+    bash $script
+done

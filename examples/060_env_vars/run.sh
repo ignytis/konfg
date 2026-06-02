@@ -15,6 +15,6 @@ export MYAPP__SERVER__PORT=9000
 export MYAPP__DATABASE__USER=admin
 
 ${app_cmd} build \
-  -i $PWD/examples/060_env_vars/config.yaml \
+  -i tplfile $PWD/examples/060_env_vars/config.yaml \
   -i env MYAPP \
   -o stdio json

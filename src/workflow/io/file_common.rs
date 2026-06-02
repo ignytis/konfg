@@ -7,7 +7,7 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    file_format_handlers::get_handler_for_format,
+    file_format_handlers::{get_handler_for_file_extension, get_handler_for_format},
     workflow::io::{BaseIoHandler, InputHandler, OutputHandler},
     workflow::stage::StageExecutionContext,
 };
@@ -22,7 +22,7 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
     };
 
     // Try to get handler by next token
-    if crate::file_format_handlers::get_handler_for_format(&next_token_maybe_format).is_some() {
+    if get_handler_for_format(&next_token_maybe_format).is_some() {
         // consume format token
         tokens.pop_front();
         return Ok(next_token_maybe_format);
@@ -34,7 +34,7 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
         .and_then(OsStr::to_str)
         .unwrap_or("");
 
-    match crate::file_format_handlers::get_handler_for_file_extension(ext) {
+    match get_handler_for_file_extension(ext) {
         Ok((id, _)) => Ok(id.to_string()),
         Err(_) => Err(anyhow!(
             "Failed to find the format handler using CLI arguments or file extension"

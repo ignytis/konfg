@@ -10,6 +10,6 @@ set -eu
 app_cmd="${APP_CMD:-cargo run --}"
 
 ${app_cmd} build \
-  -i $PWD/examples/020_dotenv_merge/app.env \
-  -i $PWD/examples/020_dotenv_merge/overrides.env \
+  -i tplfile $PWD/examples/020_dotenv_merge/app.env \
+  -i tplfile $PWD/examples/020_dotenv_merge/overrides.env \
   -o stdio json

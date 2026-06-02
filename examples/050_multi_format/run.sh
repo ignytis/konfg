@@ -10,8 +10,8 @@ set -eu
 app_cmd="${APP_CMD:-cargo run --}"
 
 ${app_cmd} build \
-  -i $PWD/examples/050_multi_format/0_db.toml \
-  -i $PWD/examples/050_multi_format/1_server.yaml \
-  -i $PWD/examples/050_multi_format/2_app.properties \
+  -i tplfile $PWD/examples/050_multi_format/0_db.toml \
+  -i tplfile $PWD/examples/050_multi_format/1_server.yaml \
+  -i tplfile $PWD/examples/050_multi_format/2_app.properties \
   -f delete filter_test.delete_me \
   -o stdio yaml
