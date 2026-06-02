@@ -1,82 +1,49 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    jinja::JinjaEngine,
     utils::hashmap::{
         hashmap_extract_nested_value, hashmap_insert_nested_value, hashmap_parse_key_parts,
     },
-    workflow::filters::{BaseFilter, Filter, TryParseFilterResult},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::filters::Filter,
+    workflow::stage::StageExecutionContext,
 };
 
-const KIND: &str = "move";
+pub const KIND: &str = "move";
 
 /// Filter that moves a parameter from one key to another in the merged configuration.
 /// Suffix '_filter' is added to file name because 'move' is a reserved word which causes issues with 'pub mod' statement
 #[derive(Clone)]
-pub struct MoveFilter;
+pub struct MoveFilter {
+    pub source: String,
+    pub destination: String,
+}
 
-impl BaseFilter for MoveFilter {
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn BaseFilter> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(
-        &self,
-        tokens: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
-    ) -> TryParseFilterResult {
-        if tokens.front().map(String::as_str) != Some(KIND) {
-            return TryParseFilterResult::NotSupported;
-        }
-
-        tokens.pop_front();
-
-        let source = match tokens.pop_front() {
+impl MoveFilter {
+    pub fn new_from_args(mut args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+        let source = match args.pop_front() {
             Some(s) => s,
-            None => return TryParseFilterResult::Error(anyhow!("move filter: missing source key")),
+            None => return Err(anyhow!("move filter: missing source key")),
         };
 
-        let destination = match tokens.pop_front() {
+        let destination = match args.pop_front() {
             Some(d) => d,
-            None => {
-                return TryParseFilterResult::Error(anyhow!(
-                    "move filter: missing destination key"
-                ));
-            }
+            None => return Err(anyhow!("move filter: missing destination key")),
         };
 
-        let mut args = HashMap::new();
-        args.insert("source".to_string(), source);
-        args.insert("destination".to_string(), destination);
-
-        TryParseFilterResult::Success(Stage::new(
-            StageKind::Filter(Box::new(self.clone())),
-            args,
-            jinja.clone(),
-        ))
+        Ok(Box::new(MoveFilter {
+            source: String::from(source),
+            destination: String::from(destination),
+        }))
     }
 }
 
 impl Filter for MoveFilter {
-    fn apply(
-        &self,
-        args: &HashMap<String, String>,
-        context: &mut StageExecutionContext,
-    ) -> Result<()> {
-        let source = args
-            .get("source")
-            .ok_or_else(|| anyhow!("Move filter: source is not specified"))?;
-        let destination = args
-            .get("destination")
-            .ok_or_else(|| anyhow!("Move filter: destination is not specified"))?;
+    fn apply(&self, context: &mut StageExecutionContext) -> Result<()> {
+        let source = &self.source;
+        let destination = &self.destination;
 
         if source == destination {
             return Ok(());
@@ -136,10 +103,10 @@ mod tests {
 
     #[test]
     fn test_move_filter_apply_simple() {
-        let filter = MoveFilter;
-        let mut args = HashMap::new();
-        args.insert("source".to_string(), "a".to_string());
-        args.insert("destination".to_string(), "b".to_string());
+        let filter = MoveFilter {
+            source: "a".to_string(),
+            destination: "b".to_string(),
+        };
 
         let mut context = StageExecutionContext {
             current_config: json!({
@@ -149,7 +116,7 @@ mod tests {
             ..Default::default()
         };
 
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(
             context.current_config,
@@ -162,10 +129,10 @@ mod tests {
 
     #[test]
     fn test_move_filter_apply_nested() {
-        let filter = MoveFilter;
-        let mut args = HashMap::new();
-        args.insert("source".to_string(), "a.b".to_string());
-        args.insert("destination".to_string(), "c.d".to_string());
+        let filter = MoveFilter {
+            source: "a.b".to_string(),
+            destination: "c.d".to_string(),
+        };
 
         let mut context = StageExecutionContext {
             current_config: json!({
@@ -176,7 +143,7 @@ mod tests {
             ..Default::default()
         };
 
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(
             context.current_config,
@@ -190,10 +157,10 @@ mod tests {
 
     #[test]
     fn test_move_filter_apply_root_source() {
-        let filter = MoveFilter;
-        let mut args = HashMap::new();
-        args.insert("source".to_string(), ".".to_string());
-        args.insert("destination".to_string(), "config".to_string());
+        let filter = MoveFilter {
+            source: ".".to_string(),
+            destination: "config".to_string(),
+        };
 
         let mut context = StageExecutionContext {
             current_config: json!({
@@ -203,7 +170,7 @@ mod tests {
             ..Default::default()
         };
 
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(
             context.current_config,
@@ -218,10 +185,10 @@ mod tests {
 
     #[test]
     fn test_move_filter_apply_root_destination() {
-        let filter = MoveFilter;
-        let mut args = HashMap::new();
-        args.insert("source".to_string(), "config".to_string());
-        args.insert("destination".to_string(), ".".to_string());
+        let filter = MoveFilter {
+            source: "config".to_string(),
+            destination: ".".to_string(),
+        };
 
         let mut context = StageExecutionContext {
             current_config: json!({
@@ -234,7 +201,7 @@ mod tests {
             ..Default::default()
         };
 
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(
             context.current_config,

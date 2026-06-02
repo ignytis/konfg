@@ -1,148 +1,127 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    jinja::JinjaEngine,
     utils::hashmap::{
         hashmap_delete_nested_value, hashmap_extract_nested_value, hashmap_insert_nested_value,
         hashmap_parse_key_parts,
     },
-    workflow::filters::{BaseFilter, Filter, TryParseFilterResult},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::filters::Filter,
+    workflow::stage::StageExecutionContext,
 };
 
-const KIND: &str = "stash";
+pub const KIND: &str = "stash";
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum StashMode {
+    Push,
+    Pop,
+}
 
 /// Filter that pushes/pops the current configuration to/from a named stash.
 #[derive(Clone)]
-pub struct StashFilter;
+pub struct StashFilter {
+    pub mode: StashMode,
+    pub key: String,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub preserve: bool,
+}
 
-impl BaseFilter for StashFilter {
-    fn supports(&self, kind: &str) -> bool {
-        kind == KIND
-    }
-
-    fn clone_box(&self) -> Box<dyn BaseFilter> {
-        Box::new(self.clone())
-    }
-
-    fn try_parse_args(
-        &self,
-        tokens: &mut VecDeque<String>,
-        jinja: &JinjaEngine,
-    ) -> TryParseFilterResult {
-        if tokens.front().map(String::as_str) != Some(KIND) {
-            return TryParseFilterResult::NotSupported;
-        }
-
-        tokens.pop_front();
-
-        let mode = match tokens.pop_front() {
+impl StashFilter {
+    pub fn new_from_args(mut args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+        let mode_str = match args.pop_front() {
             Some(m) => m,
-            None => {
-                return TryParseFilterResult::Error(anyhow!(
-                    "stash filter: missing mode (push|pop)"
+            None => return Err(anyhow!("stash filter: missing mode (push|pop)")),
+        };
+
+        let mode = match mode_str.as_str() {
+            "push" => StashMode::Push,
+            "pop" => StashMode::Pop,
+            _ => {
+                return Err(anyhow!(
+                    "stash filter: unknown mode '{}', expected push or pop",
+                    mode_str
                 ));
             }
         };
 
-        if mode != "push" && mode != "pop" {
-            return TryParseFilterResult::Error(anyhow!(
-                "stash filter: unknown mode '{}', expected push or pop",
-                mode
-            ));
-        }
+        let key;
+        let mut source = None;
+        let mut destination = None;
+        let mut preserve = false;
 
-        let mut args = HashMap::new();
-        args.insert("mode".to_string(), mode.clone());
-
-        if mode == "push" {
-            if tokens.is_empty() {
-                return TryParseFilterResult::Error(anyhow!("stash filter: missing destination"));
+        if mode == StashMode::Push {
+            if args.is_empty() {
+                return Err(anyhow!("stash filter: missing destination"));
             }
 
             // The last one is the key
-            let key = tokens.pop_back().unwrap();
-            args.insert("key".to_string(), key);
+            key = args.pop_back().unwrap();
 
             // The rest are flags
-            while let Some(token) = tokens.pop_front() {
+            while let Some(token) = args.pop_front() {
                 if token.starts_with("--source=") {
-                    args.insert(
-                        "source".to_string(),
-                        token.trim_start_matches("--source=").to_string(),
-                    );
+                    source = Some(token.trim_start_matches("--source=").to_string());
                 } else if token == "--preserve" {
-                    args.insert("preserve".to_string(), "true".to_string());
+                    preserve = true;
                 } else {
-                    return TryParseFilterResult::Error(anyhow!(
-                        "stash filter: unknown argument '{}'",
-                        token
-                    ));
+                    return Err(anyhow!("stash filter: unknown argument '{}'", token));
                 }
             }
         } else {
-            // mode == "pop"
-            while let Some(token) = tokens.front() {
+            // mode == Pop
+            while let Some(token) = args.front() {
                 if token == "--preserve" {
-                    args.insert("preserve".to_string(), "true".to_string());
-                    tokens.pop_front();
+                    preserve = true;
+                    args.pop_front();
                 } else {
                     break;
                 }
             }
 
-            let key = match tokens.pop_front() {
+            key = match args.pop_front() {
                 Some(k) => k,
-                None => return TryParseFilterResult::Error(anyhow!("stash filter: missing key")),
+                None => return Err(anyhow!("stash filter: missing key")),
             };
-            args.insert("key".to_string(), key);
 
-            if let Some(dest) = tokens.pop_front() {
-                args.insert("dest".to_string(), dest);
+            if let Some(dest) = args.pop_front() {
+                destination = Some(dest);
             }
 
-            if !tokens.is_empty() {
-                return TryParseFilterResult::Error(anyhow!(
+            if !args.is_empty() {
+                return Err(anyhow!(
                     "stash filter: unknown argument '{}'",
-                    tokens.front().unwrap()
+                    args.front().unwrap()
                 ));
             }
         }
 
-        TryParseFilterResult::Success(Stage::new(
-            StageKind::Filter(Box::new(self.clone())),
-            args,
-            jinja.clone(),
-        ))
+        Ok(Box::new(StashFilter {
+            mode,
+            key,
+            source,
+            destination,
+            preserve,
+        }))
     }
 }
 
 impl Filter for StashFilter {
-    fn apply(
-        &self,
-        args: &HashMap<String, String>,
-        context: &mut StageExecutionContext,
-    ) -> Result<()> {
-        let mode = args
-            .get("mode")
-            .ok_or_else(|| anyhow!("stash filter: mode is not specified"))?;
-        let key = args
-            .get("key")
-            .ok_or_else(|| anyhow!("stash filter: key is not specified"))?;
+    fn apply(&self, context: &mut StageExecutionContext) -> Result<()> {
+        let key = &self.key;
 
-        match mode.as_str() {
-            "push" => {
+        match self.mode {
+            StashMode::Push => {
                 if context.stash.contains_key(key) {
                     return Err(anyhow!("stash filter: key '{}' already exists", key));
                 }
 
-                let source = args.get("source");
-                let preserve = args.get("preserve").map(|v| v == "true").unwrap_or(false);
+                let preserve = self.preserve;
 
-                if let Some(s) = source {
+                if let Some(s) = &self.source {
                     let parts = hashmap_parse_key_parts(s);
                     let current_obj = context
                         .current_config
@@ -190,8 +169,8 @@ impl Filter for StashFilter {
                     }
                 }
             }
-            "pop" => {
-                let preserve = args.get("preserve").map(|v| v == "true").unwrap_or(false);
+            StashMode::Pop => {
+                let preserve = self.preserve;
                 let mut value = if preserve {
                     context.stash.get(key).cloned()
                 } else {
@@ -216,7 +195,7 @@ impl Filter for StashFilter {
                     value = Value::Object(map);
                 }
 
-                match args.get("dest") {
+                match &self.destination {
                     None => context.current_config = value,
                     Some(dest) => {
                         let parts = hashmap_parse_key_parts(dest);
@@ -236,7 +215,6 @@ impl Filter for StashFilter {
                     }
                 }
             }
-            _ => return Err(anyhow!("stash filter: unknown mode '{}'", mode)),
         }
 
         Ok(())
@@ -248,22 +226,19 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn make_args(mode: &str, key: &str) -> HashMap<String, String> {
-        let mut args = HashMap::new();
-        args.insert("mode".to_string(), mode.to_string());
-        args.insert("key".to_string(), key.to_string());
-        args
-    }
-
     #[test]
     fn test_push_stores_config_and_clears() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
 
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.stash["saved"], json!({"a": 1}));
         assert_eq!(context.current_config, json!({}));
@@ -271,13 +246,17 @@ mod tests {
 
     #[test]
     fn test_push_with_preserve_keeps_config() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: true,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
 
-        let mut args = make_args("push", "saved");
-        args.insert("preserve".to_string(), "true".to_string());
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.stash["saved"], json!({"a": 1}));
         assert_eq!(context.current_config, json!({"a": 1}));
@@ -285,13 +264,17 @@ mod tests {
 
     #[test]
     fn test_push_with_source_extracts_subproperty() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: Some("a.b".to_string()),
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": {"b": 1}, "x": 2});
 
-        let mut args = make_args("push", "saved");
-        args.insert("source".to_string(), "a.b".to_string());
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.stash["saved"], json!(1));
         // Note: a becomes empty and is removed by hashmap_extract_nested_value
@@ -300,14 +283,17 @@ mod tests {
 
     #[test]
     fn test_push_with_source_and_preserve() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: Some("a.b".to_string()),
+            destination: None,
+            preserve: true,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": {"b": 1}, "x": 2});
 
-        let mut args = make_args("push", "saved");
-        args.insert("source".to_string(), "a.b".to_string());
-        args.insert("preserve".to_string(), "true".to_string());
-        filter.apply(&args, &mut context).unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.stash["saved"], json!(1));
         assert_eq!(context.current_config, json!({"a": {"b": 1}, "x": 2}));
@@ -315,71 +301,62 @@ mod tests {
 
     #[test]
     fn test_push_duplicate_key_errors() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
+        filter.apply(&mut context).unwrap();
 
         context.current_config = json!({"b": 2});
-        let result = filter.apply(&make_args("push", "saved"), &mut context);
+        let result = filter.apply(&mut context);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_try_parse_args_push_with_flags() {
-        let filter = StashFilter;
-        let jinja = JinjaEngine::new();
-        let mut tokens = VecDeque::from(vec![
-            "stash".to_string(),
+    fn test_new_from_args_push_with_flags() {
+        let tokens = VecDeque::from(vec![
             "push".to_string(),
             "--source=a.b".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
         ]);
 
-        let result = filter.try_parse_args(&mut tokens, &jinja);
-        match result {
-            TryParseFilterResult::Success(stage) => {
-                assert_eq!(stage.args.get("mode").unwrap(), "push");
-                assert_eq!(stage.args.get("key").unwrap(), "mykey");
-                assert_eq!(stage.args.get("source").unwrap(), "a.b");
-                assert_eq!(stage.args.get("preserve").unwrap(), "true");
-            }
-            _ => panic!("Expected Success"),
-        }
+        let _filter_box = StashFilter::new_from_args(tokens).unwrap();
     }
 
     #[test]
-    fn test_try_parse_args_push_destination_not_last_fails() {
-        let filter = StashFilter;
-        let jinja = JinjaEngine::new();
-        let mut tokens = VecDeque::from(vec![
-            "stash".to_string(),
+    fn test_new_from_args_push_destination_not_last_fails() {
+        let tokens = VecDeque::from(vec![
             "push".to_string(),
             "mykey".to_string(),
             "--preserve".to_string(),
         ]);
 
-        let result = filter.try_parse_args(&mut tokens, &jinja);
-        match result {
-            TryParseFilterResult::Error(e) => {
-                assert!(e.to_string().contains("unknown argument 'mykey'"));
-            }
-            _ => panic!("Expected Error"),
+        let result = StashFilter::new_from_args(tokens);
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(e.to_string().contains("unknown argument 'mykey'"));
         }
     }
 
     #[test]
     fn test_push_auto_unwraps_key() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"saved": {"a": 1}, "x": 2});
 
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.stash["saved"], json!({"a": 1}));
         assert_eq!(context.current_config, json!({"x": 2}));
@@ -387,15 +364,19 @@ mod tests {
 
     #[test]
     fn test_pop_flattens_values() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context
             .stash
             .insert("saved".to_string(), json!({"values": {"a": 1}, "b": 2}));
 
-        filter
-            .apply(&make_args("pop", "saved"), &mut context)
-            .unwrap();
+        filter.apply(&mut context).unwrap();
 
         assert_eq!(context.current_config, json!({"a": 1, "b": 2}));
         assert!(!context.stash.contains_key("saved"));
@@ -403,16 +384,24 @@ mod tests {
 
     #[test]
     fn test_pop_restores_config() {
-        let filter = StashFilter;
+        let push_filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
+        let pop_filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
-
-        filter
-            .apply(&make_args("pop", "saved"), &mut context)
-            .unwrap();
+        push_filter.apply(&mut context).unwrap();
+        pop_filter.apply(&mut context).unwrap();
 
         assert_eq!(context.current_config, json!({"a": 1}));
         assert!(!context.stash.contains_key("saved"));
@@ -420,66 +409,77 @@ mod tests {
 
     #[test]
     fn test_pop_with_preserve_keeps_in_stash() {
-        let filter = StashFilter;
+        let push_filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
+        let pop_filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: true,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
-
-        let mut args = make_args("pop", "saved");
-        args.insert("preserve".to_string(), "true".to_string());
-        filter.apply(&args, &mut context).unwrap();
+        push_filter.apply(&mut context).unwrap();
+        pop_filter.apply(&mut context).unwrap();
 
         assert_eq!(context.current_config, json!({"a": 1}));
         assert_eq!(context.stash["saved"], json!({"a": 1}));
     }
 
     #[test]
-    fn test_try_parse_args_pop_with_preserve() {
-        let filter = StashFilter;
-        let jinja = JinjaEngine::new();
-        let mut tokens = VecDeque::from(vec![
-            "stash".to_string(),
+    fn test_new_from_args_pop_with_preserve() {
+        let tokens = VecDeque::from(vec![
             "pop".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
             "dest.path".to_string(),
         ]);
 
-        let result = filter.try_parse_args(&mut tokens, &jinja);
-        match result {
-            TryParseFilterResult::Success(stage) => {
-                assert_eq!(stage.args.get("mode").unwrap(), "pop");
-                assert_eq!(stage.args.get("key").unwrap(), "mykey");
-                assert_eq!(stage.args.get("dest").unwrap(), "dest.path");
-                assert_eq!(stage.args.get("preserve").unwrap(), "true");
-            }
-            _ => panic!("Expected Success"),
-        }
+        let _ = StashFilter::new_from_args(tokens).unwrap();
     }
 
     #[test]
     fn test_pop_missing_key_errors() {
-        let filter = StashFilter;
+        let filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "missing".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
-        let result = filter.apply(&make_args("pop", "missing"), &mut context);
+        let result = filter.apply(&mut context);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_pop_with_dest_inserts_into_current_config() {
-        let filter = StashFilter;
+        let push_filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
+        let pop_filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "saved".to_string(),
+            source: None,
+            destination: Some("restored".to_string()),
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
+        push_filter.apply(&mut context).unwrap();
 
         context.current_config = json!({"x": 10});
-        let mut args = make_args("pop", "saved");
-        args.insert("dest".to_string(), "restored".to_string());
-        filter.apply(&args, &mut context).unwrap();
+        pop_filter.apply(&mut context).unwrap();
 
         assert_eq!(
             context.current_config,
@@ -490,17 +490,26 @@ mod tests {
 
     #[test]
     fn test_pop_with_dest_errors_if_dest_exists() {
-        let filter = StashFilter;
+        let push_filter = StashFilter {
+            mode: StashMode::Push,
+            key: "saved".to_string(),
+            source: None,
+            destination: None,
+            preserve: false,
+        };
+        let pop_filter = StashFilter {
+            mode: StashMode::Pop,
+            key: "saved".to_string(),
+            source: None,
+            destination: Some("restored".to_string()),
+            preserve: false,
+        };
         let mut context = StageExecutionContext::new();
         context.current_config = json!({"a": 1});
-        filter
-            .apply(&make_args("push", "saved"), &mut context)
-            .unwrap();
+        push_filter.apply(&mut context).unwrap();
 
         context.current_config = json!({"restored": 99});
-        let mut args = make_args("pop", "saved");
-        args.insert("dest".to_string(), "restored".to_string());
-        let result = filter.apply(&args, &mut context);
+        let result = pop_filter.apply(&mut context);
         assert!(result.is_err());
     }
 }

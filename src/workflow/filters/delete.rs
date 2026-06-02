@@ -24,15 +24,14 @@ impl DeleteFilter {
             None => return Err(anyhow!("delete filter: missing key")),
         };
 
-        Ok(Box::new(DeleteFilter { key: String::from(key) }))
+        Ok(Box::new(DeleteFilter {
+            key: String::from(key),
+        }))
     }
 }
 
 impl Filter for DeleteFilter {
-    fn apply(
-        &self,
-        context: &mut StageExecutionContext,
-    ) -> Result<()> {
+    fn apply(&self, context: &mut StageExecutionContext) -> Result<()> {
         let parts = hashmap_parse_key_parts(self.key.as_str());
 
         if let Value::Object(map) = &mut context.current_config {
@@ -49,14 +48,13 @@ impl Filter for DeleteFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use serde_json::json;
 
     #[test]
     fn test_delete_filter_apply() {
-        let filter = DeleteFilter { key: String::new() };
-        let mut args = HashMap::new();
-        args.insert("key".to_string(), "a.b".to_string());
+        let filter = DeleteFilter {
+            key: "a.b".to_string(),
+        };
 
         let mut context = StageExecutionContext {
             current_config: json!({

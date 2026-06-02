@@ -154,10 +154,10 @@ impl Stage {
             Some(i) => i,
             None => return Err(anyhow!("Missing filter id")),
         };
-        
+
         for (it_id, it_creator_fn) in REGISTERED_FILTERS.iter() {
             if !id.eq(it_id) {
-                continue
+                continue;
             }
 
             let handler = it_creator_fn(tokens)?;

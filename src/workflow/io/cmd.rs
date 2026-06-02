@@ -164,8 +164,8 @@ mod tests {
         let handler = CmdHandler;
         let mut tokens = VecDeque::from(vec![
             "cmd".to_string(),
-            "ls".to_string(),
             "json".to_string(),
+            "ls".to_string(),
         ]);
         let jinja = JinjaEngine::new();
 
