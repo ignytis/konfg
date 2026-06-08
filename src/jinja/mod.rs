@@ -16,15 +16,15 @@ impl JinjaEngine {
         Self { env }
     }
 
-    pub fn render<S: Into<String>>(
+    pub fn render(
         &self,
-        template: S,
+        template: &str,
         path: &str,
         ctx: &serde_json::Value,
     ) -> Result<String> {
         match self
             .env
-            .render_named_str(path, template.into().as_str(), ctx)
+            .render_named_str(path, template, ctx)
         {
             Ok(s) => Ok(s),
             Err(e) => anyhow::bail!(
