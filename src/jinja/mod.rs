@@ -12,16 +12,25 @@ impl JinjaEngine {
     pub fn new() -> Self {
         let mut env = Environment::new();
         register_functions(&mut env);
+        env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
         Self { env }
     }
 
-    pub fn render<S: Into<String>>(&self, template: S, ctx: &serde_json::Value) -> Result<String> {
+    pub fn render<S: Into<String>>(
+        &self,
+        template: S,
+        path: &str,
+        ctx: &serde_json::Value,
+    ) -> Result<String> {
         match self
             .env
-            .render_named_str("configuration", template.into().as_str(), ctx)
+            .render_named_str(path, template.into().as_str(), ctx)
         {
             Ok(s) => Ok(s),
-            Err(e) => Err(e.into()),
+            Err(e) => anyhow::bail!(
+                "An error occurred while rendering the template:\n{}",
+                e.display_debug_info().to_string()
+            ),
         }
     }
 }

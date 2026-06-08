@@ -56,7 +56,9 @@ impl InputHandler for StdioHandler {
     fn read(&self, context: &StageExecutionContext) -> Result<Value> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
-        let rendered = self.jinja.render(&buf, &context.current_config)?;
+        let rendered = self
+            .jinja
+            .render(&buf, "(stdin)", &context.current_config)?;
 
         get_handler_for_format(&self.format)
             .ok_or_else(|| anyhow!("Format handler not found for: {}", self.format))?

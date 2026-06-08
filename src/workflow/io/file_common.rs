@@ -45,7 +45,12 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
 /// Hook for preprocessing raw file content before parsing.
 /// Default implementation returns the content unchanged.
 pub trait FilePreprocessor: BaseIoHandler {
-    fn preprocess(&self, raw: &str, _context: &StageExecutionContext) -> Result<String> {
+    fn preprocess(
+        &self,
+        raw: &str,
+        _path: &str,
+        _context: &StageExecutionContext,
+    ) -> Result<String> {
         Ok(raw.to_string())
     }
 
@@ -58,7 +63,7 @@ impl<H: FilePreprocessor + Clone + Send + Sync + 'static> InputHandler for H {
     fn read(&self, context: &StageExecutionContext) -> Result<Value> {
         let path = self.get_path();
         let raw = fs::read_to_string(path)?;
-        let content = self.preprocess(&raw, context)?;
+        let content = self.preprocess(&raw, &path, context)?;
 
         let format = self.get_format();
         get_handler_for_format(format)

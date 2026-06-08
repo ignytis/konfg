@@ -64,8 +64,8 @@ impl TplFileHandler {
 }
 
 impl FilePreprocessor for TplFileHandler {
-    fn preprocess(&self, raw: &str, context: &StageExecutionContext) -> Result<String> {
-        self.jinja.render(raw, &context.current_config)
+    fn preprocess(&self, raw: &str, path: &str, context: &StageExecutionContext) -> Result<String> {
+        self.jinja.render(raw, path, &context.current_config)
     }
 
     fn get_path(&self) -> &str {
