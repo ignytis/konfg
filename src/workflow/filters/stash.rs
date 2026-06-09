@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Ok, Result, anyhow};
 use serde_json::Value;
 
 use crate::{
@@ -20,6 +20,18 @@ pub enum StashMode {
     Pop,
 }
 
+impl TryFrom<&str> for StashMode {
+    fn try_from(v: &str) -> std::prelude::v1::Result<Self, Self::Error> {
+        match v {
+            "push" => Ok(StashMode::Push),
+            "pop" => Ok(StashMode::Pop),
+            _ => Err(anyhow!("Unknown stash mode: {}", v)),
+        }
+    }
+
+    type Error = anyhow::Error;
+}
+
 /// Filter that pushes/pops the current configuration to/from a named stash.
 #[derive(Clone)]
 pub struct StashFilter {
@@ -37,17 +49,7 @@ impl StashFilter {
             None => return Err(anyhow!("stash filter: missing mode (push|pop)")),
         };
 
-        let mode = match mode_str.as_str() {
-            "push" => StashMode::Push,
-            "pop" => StashMode::Pop,
-            _ => {
-                return Err(anyhow!(
-                    "stash filter: unknown mode '{}', expected push or pop",
-                    mode_str
-                ));
-            }
-        };
-
+        let mode: StashMode = mode_str.as_str().try_into()?;
         let key;
         let mut source = None;
         let mut destination = None;
@@ -107,117 +109,125 @@ impl StashFilter {
             preserve,
         }))
     }
+
+
+    fn _push(&self, context: &mut StageExecutionContext) -> Result<()> {
+        let key = &self.key;
+        if context.stash.contains_key(key) {
+            return Err(anyhow!("stash filter: key '{}' already exists", key));
+        }
+
+        let preserve = self.preserve;
+
+        // If no source is provided, try to use key as a source if it exists in the config
+        if self.source.is_none() {
+            let parts = hashmap_parse_key_parts(key);
+            let extracted = if let Value::Object(map) = &context.current_config {
+                let (_, val) = hashmap_extract_nested_value(map.clone(), &parts);
+                val
+            } else {
+                None
+            };
+
+            if let Some(value) = extracted {
+                context.stash.insert(key.clone(), value);
+                if !preserve {
+                    if let Value::Object(map) = &mut context.current_config {
+                        let original_map = std::mem::take(map);
+                        *map = hashmap_delete_nested_value(original_map, &parts);
+                    }
+                }
+            } else {
+                let value = if preserve {
+                    context.current_config.clone()
+                } else {
+                    std::mem::replace(
+                        &mut context.current_config,
+                        Value::Object(Default::default()),
+                    )
+                };
+                context.stash.insert(key.clone(), value);
+            }
+            return Ok(())
+        }
+
+        let s = self.source.as_ref().unwrap().as_str();
+        let parts = hashmap_parse_key_parts(s);
+        let current_obj = context
+            .current_config
+            .as_object()
+            .ok_or_else(|| anyhow!("stash filter: current_config is not an object"))?
+            .clone();
+
+        let (new_map, extracted) = hashmap_extract_nested_value(current_obj, &parts);
+        let value = extracted
+            .ok_or_else(|| anyhow!("stash filter: source '{}' not found", s))?;
+
+        context.stash.insert(key.clone(), value);
+
+        if !preserve {
+            context.current_config = Value::Object(new_map);
+        }
+        Ok(())
+    }
+
+    fn _pop(&self, context: &mut StageExecutionContext) -> Result<()> {
+        let key = &self.key;
+        let preserve = self.preserve;
+        let mut value = if preserve {
+            context.stash.get(key).cloned()
+        } else {
+            context.stash.remove(key)
+        }
+        .ok_or_else(|| anyhow!("stash filter: key '{}' does not exist", key))?;
+
+        // Flatten "values" property if it exists in the popped object to eliminate extra nesting
+        if let Value::Object(mut map) = value {
+            if let Some(inner) = map.remove("values") {
+                if let Value::Object(inner_map) = inner {
+                    for (k, v) in inner_map {
+                        // If there's a collision, the original value (not from "values") wins
+                        // but usually there's no collision in this workflow
+                        map.entry(k).or_insert(v);
+                    }
+                } else {
+                    // If it's not an object, put it back
+                    map.insert("values".to_string(), inner);
+                }
+            }
+            value = Value::Object(map);
+        }
+
+        if self.destination.is_none() {
+            context.current_config = value;
+            return Ok(());
+        }
+
+        let dest = self.destination.as_ref().unwrap().as_str();
+        let parts = hashmap_parse_key_parts(dest);
+        let mut map =
+            match std::mem::replace(&mut context.current_config, Value::Null) {
+                Value::Object(m) => m,
+                _ => serde_json::Map::new(),
+            };
+
+        let (_, existing) = hashmap_extract_nested_value(map.clone(), &parts);
+        let mut target_val =
+            existing.unwrap_or(Value::Object(serde_json::Map::new()));
+
+        crate::utils::cfg_values::cfg_values_deep_merge(&mut target_val, &value)?;
+        map = hashmap_insert_nested_value(map, &parts, target_val);
+        context.current_config = Value::Object(map);
+        Ok(())
+    }
 }
 
 impl Filter for StashFilter {
     fn apply(&self, context: &mut StageExecutionContext) -> Result<()> {
-        let key = &self.key;
-
         match self.mode {
-            StashMode::Push => {
-                if context.stash.contains_key(key) {
-                    return Err(anyhow!("stash filter: key '{}' already exists", key));
-                }
-
-                let preserve = self.preserve;
-
-                if let Some(s) = &self.source {
-                    let parts = hashmap_parse_key_parts(s);
-                    let current_obj = context
-                        .current_config
-                        .as_object()
-                        .ok_or_else(|| anyhow!("stash filter: current_config is not an object"))?
-                        .clone();
-
-                    let (new_map, extracted) = hashmap_extract_nested_value(current_obj, &parts);
-                    let value = extracted
-                        .ok_or_else(|| anyhow!("stash filter: source '{}' not found", s))?;
-
-                    context.stash.insert(key.clone(), value);
-
-                    if !preserve {
-                        context.current_config = Value::Object(new_map);
-                    }
-                } else {
-                    // If no source is provided, try to use key as a source if it exists in the config
-                    let parts = hashmap_parse_key_parts(key);
-                    let extracted = if let Value::Object(map) = &context.current_config {
-                        let (_, val) = hashmap_extract_nested_value(map.clone(), &parts);
-                        val
-                    } else {
-                        None
-                    };
-
-                    if let Some(value) = extracted {
-                        context.stash.insert(key.clone(), value);
-                        if !preserve {
-                            if let Value::Object(map) = &mut context.current_config {
-                                let original_map = std::mem::take(map);
-                                *map = hashmap_delete_nested_value(original_map, &parts);
-                            }
-                        }
-                    } else {
-                        let value = if preserve {
-                            context.current_config.clone()
-                        } else {
-                            std::mem::replace(
-                                &mut context.current_config,
-                                Value::Object(Default::default()),
-                            )
-                        };
-                        context.stash.insert(key.clone(), value);
-                    }
-                }
-            }
-            StashMode::Pop => {
-                let preserve = self.preserve;
-                let mut value = if preserve {
-                    context.stash.get(key).cloned()
-                } else {
-                    context.stash.remove(key)
-                }
-                .ok_or_else(|| anyhow!("stash filter: key '{}' does not exist", key))?;
-
-                // Flatten "values" property if it exists in the popped object to eliminate extra nesting
-                if let Value::Object(mut map) = value {
-                    if let Some(inner) = map.remove("values") {
-                        if let Value::Object(inner_map) = inner {
-                            for (k, v) in inner_map {
-                                // If there's a collision, the original value (not from "values") wins
-                                // but usually there's no collision in this workflow
-                                map.entry(k).or_insert(v);
-                            }
-                        } else {
-                            // If it's not an object, put it back
-                            map.insert("values".to_string(), inner);
-                        }
-                    }
-                    value = Value::Object(map);
-                }
-
-                match &self.destination {
-                    None => context.current_config = value,
-                    Some(dest) => {
-                        let parts = hashmap_parse_key_parts(dest);
-                        let mut map =
-                            match std::mem::replace(&mut context.current_config, Value::Null) {
-                                Value::Object(m) => m,
-                                _ => serde_json::Map::new(),
-                            };
-
-                        let (_, existing) = hashmap_extract_nested_value(map.clone(), &parts);
-                        let mut target_val =
-                            existing.unwrap_or(Value::Object(serde_json::Map::new()));
-
-                        crate::utils::cfg_values::cfg_values_deep_merge(&mut target_val, &value)?;
-                        map = hashmap_insert_nested_value(map, &parts, target_val);
-                        context.current_config = Value::Object(map);
-                    }
-                }
-            }
+            StashMode::Push => self._push(context),
+            StashMode::Pop => self._pop(context),
         }
-
-        Ok(())
     }
 }
 
