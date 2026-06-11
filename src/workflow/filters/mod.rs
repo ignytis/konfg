@@ -1,4 +1,5 @@
 pub mod delete;
+pub mod merge_strategies_reset;
 pub mod move_filter;
 pub mod stash;
 
@@ -14,6 +15,10 @@ pub const REGISTERED_FILTERS: LazyLock<Vec<(&'static str, FilterCreatorFn)>> =
     LazyLock::new(|| {
         vec![
             (delete::KIND, delete::DeleteFilter::new_from_args),
+            (
+                merge_strategies_reset::KIND,
+                merge_strategies_reset::MergeStrategiesResetFilter::new_from_args,
+            ),
             (move_filter::KIND, move_filter::MoveFilter::new_from_args),
             (stash::KIND, stash::StashFilter::new_from_args),
         ]

@@ -2,7 +2,7 @@ pub mod filters;
 pub mod io;
 pub mod stage;
 
-use std::collections::{HashMap, LinkedList, VecDeque};
+use std::collections::{LinkedList, VecDeque};
 
 use anyhow::{Result, anyhow};
 
@@ -27,8 +27,6 @@ pub struct Workflow {
     /// List of stages to be executed sequentially.
     /// The last stage is always the output stage.
     pub stages: LinkedList<Stage>,
-    /// Merge strategies to apply when merging inputs.
-    pub merge_strategies: HashMap<String, VecDeque<String>>,
 }
 
 impl Workflow {
@@ -37,7 +35,6 @@ impl Workflow {
         let jinja = JinjaEngine::new();
 
         let mut stages = LinkedList::new();
-        let mut merge_strategies = HashMap::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
             let mut buf = parse_arg_buffer(&mut queue);
@@ -63,17 +60,34 @@ impl Workflow {
                     for arg in buf {
                         args_deque.push_back(arg);
                     }
-                    merge_strategies.insert(path, args_deque);
+                    stages.push_back(Stage::new(StageKind::MergeStrategy {
+                        path,
+                        strategy: args_deque,
+                    }));
                 }
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
             }
         }
 
-        // Validation: The first stage must be an input stage
+        // Validation: Ensure there is at least one input stage
+        let has_input = stages.iter().any(|s| s.is_input());
+        if !has_input {
+            return Err(anyhow!("No input stages provided"));
+        }
+
+        // Validation: The first stage must be an input or merge strategy stage
         match stages.front() {
-            Some(first) if first.is_input() => (),
-            Some(_) => return Err(anyhow!("The first stage must be an input stage")),
-            None => return Err(anyhow!("No input stages provided")),
+            Some(first)
+                if first.is_input() || matches!(first.kind, StageKind::MergeStrategy { .. }) =>
+            {
+                ()
+            }
+            Some(_) => {
+                return Err(anyhow!(
+                    "The first stage must be an input or merge strategy stage"
+                ));
+            }
+            None => return Err(anyhow!("No stages provided")),
         }
 
         // Validation: The last stage must be an output stage. If not, add default.
@@ -82,16 +96,12 @@ impl Workflow {
             stages.push_back(Stage::new_output_default());
         }
 
-        Ok(Workflow {
-            stages,
-            merge_strategies,
-        })
+        Ok(Workflow { stages })
     }
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
     pub fn execute(&self) -> Result<()> {
         let mut context = StageExecutionContext::new();
-        context.merge_strategies = self.merge_strategies.clone();
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
             let value = stage.run(&mut context)?;
@@ -138,7 +148,10 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
 mod tests {
     use crate::{
         utils::cfg_values::cfg_values_deep_merge,
-        workflow::{Workflow, stage::StageExecutionContext},
+        workflow::{
+            Workflow,
+            stage::{StageExecutionContext, StageKind},
+        },
     };
 
     use anyhow::Result;
@@ -161,15 +174,21 @@ mod tests {
         ];
 
         let workflow = Workflow::try_from_args(args)?;
-        assert_eq!(workflow.stages.len(), 2);
+        assert_eq!(workflow.stages.len(), 3);
 
-        let strategy = workflow
-            .merge_strategies
-            .get("my_attribute.my_subattribute")
-            .unwrap();
-        assert_eq!(strategy.get(0).unwrap(), "merge_by_key");
-        assert_eq!(strategy.get(1).unwrap(), "name");
-        assert_eq!(strategy.len(), 2);
+        let mut stages_iter = workflow.stages.iter();
+        let first = stages_iter.next().unwrap();
+        assert!(first.is_input());
+
+        let second = stages_iter.next().unwrap();
+        if let StageKind::MergeStrategy { path, strategy } = &second.kind {
+            assert_eq!(path, "my_attribute.my_subattribute");
+            assert_eq!(strategy.get(0).unwrap(), "merge_by_key");
+            assert_eq!(strategy.get(1).unwrap(), "name");
+            assert_eq!(strategy.len(), 2);
+        } else {
+            panic!("Expected MergeStrategy stage");
+        }
 
         Ok(())
     }
@@ -181,22 +200,21 @@ mod tests {
             "param".to_string(),
             "a.b".to_string(),
             "c".to_string(),
+            "-m".to_string(),
+            "a".to_string(),
+            "overwrite".to_string(),
             "-i".to_string(),
             "param".to_string(),
             "a.d".to_string(),
             "e".to_string(),
-            "-m".to_string(),
-            "a".to_string(),
-            "overwrite".to_string(),
         ];
 
         let workflow = Workflow::try_from_args(args)?;
         let mut context = StageExecutionContext::new();
-        context.merge_strategies = workflow.merge_strategies.clone();
 
         for stage in &workflow.stages {
+            let value = stage.run(&mut context)?;
             if stage.is_input() {
-                let value = stage.run(&mut context)?;
                 cfg_values_deep_merge(
                     &mut context.current_config,
                     &value,
@@ -207,6 +225,48 @@ mod tests {
 
         // With overwrite strategy on "a", the second input (a.d = e) should completely overwrite the first (a.b = c).
         assert_eq!(context.current_config, json!({ "a": { "d": "e" } }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_workflow_execute_with_merge_strategies_reset() -> Result<()> {
+        let args = vec![
+            "-i".to_string(),
+            "param".to_string(),
+            "a.b".to_string(),
+            "c".to_string(),
+            "-m".to_string(),
+            "a".to_string(),
+            "overwrite".to_string(),
+            "-f".to_string(),
+            "merge_strategies_reset".to_string(),
+            "-i".to_string(),
+            "param".to_string(),
+            "a.d".to_string(),
+            "e".to_string(),
+        ];
+
+        let workflow = Workflow::try_from_args(args)?;
+        let mut context = StageExecutionContext::new();
+
+        for stage in &workflow.stages {
+            let value = stage.run(&mut context)?;
+            if stage.is_input() {
+                cfg_values_deep_merge(
+                    &mut context.current_config,
+                    &value,
+                    &context.merge_strategies,
+                )?;
+            }
+        }
+
+        // With overwrite strategy reset before the second input,
+        // it should merge with default simple strategy (appending/recursive merge).
+        assert_eq!(
+            context.current_config,
+            json!({ "a": { "b": "c", "d": "e" } })
+        );
 
         Ok(())
     }

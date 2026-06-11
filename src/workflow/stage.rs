@@ -12,10 +12,21 @@ use crate::{
     },
 };
 
+/// The kinds of stages supported by the workflow.
 pub enum StageKind {
+    /// An input stage that reads configuration.
     Input(Box<dyn InputHandler>),
+    /// An output stage that writes configuration.
     Output(Box<dyn OutputHandler>),
+    /// A filter stage that modifies configuration.
     Filter(Box<dyn Filter>),
+    /// A stage that modifies the active merge strategy.
+    MergeStrategy {
+        /// The path where the strategy is applied.
+        path: String,
+        /// The strategy ID followed by strategy-specific arguments.
+        strategy: VecDeque<String>,
+    },
 }
 
 /// Execution context for a stage.
@@ -81,6 +92,12 @@ impl Stage {
             }
             StageKind::Filter(handler) => {
                 handler.apply(context)?;
+                Ok(Value::Null)
+            }
+            StageKind::MergeStrategy { path, strategy } => {
+                context
+                    .merge_strategies
+                    .insert(path.clone(), strategy.clone());
                 Ok(Value::Null)
             }
         }

@@ -25,11 +25,12 @@ ${app_cmd} build \
     -o stdio yaml
 
 echo -e "\n=== 3. Using overwrite strategy ==="
-echo "Applying overwrite strategy forces the target property to be completely replaced by the source, rather than merged recursively."
+echo "Applying overwrite strategy forces the target property to be completely replaced by the source, rather than merged recursively. We can also rewrite or reset it afterwards."
 ${app_cmd} build \
     -i file ./examples/300_merge_strategies/config_a.yaml \
-    -i file ./examples/300_merge_strategies/config_b.yaml \
     -m app.database overwrite \
+    -i file ./examples/300_merge_strategies/config_b.yaml \
+    -m app.database simple \
     -o stdio yaml
 
 echo -e "\n=== 4. Combining both strategies ==="
