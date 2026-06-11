@@ -2,6 +2,7 @@ pub mod cmd;
 pub mod env;
 pub mod file;
 pub mod file_common;
+pub mod noop;
 pub mod param;
 pub mod stdio;
 pub mod tplfile;
@@ -27,6 +28,7 @@ pub const REGISTERED_HANDLERS: LazyLock<Vec<(&'static str, IoHandlerCreatorFn)>>
             (tplfile::KIND, tplfile::TplFileHandler::new_from_args),
             (env::KIND, env::EnvHandler::new_from_args),
             (param::KIND, param::ParamHandler::new_from_args),
+            (noop::KIND, noop::NoopHandler::new_from_args),
         ]
     });
 

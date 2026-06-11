@@ -43,7 +43,9 @@ impl Workflow {
                 TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
                 TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
                 TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => Stage::try_from_strings_filter,
-                TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => Stage::try_from_strings_merge_strategy,
+                TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => {
+                    Stage::try_from_strings_merge_strategy
+                }
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
             };
             stages.push_back(stage_creator_fn(buf, &jinja)?);

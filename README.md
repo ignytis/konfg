@@ -132,6 +132,7 @@ konfg build [options]
   - `stdio <format>`: Write to standard output as `<format>`.
   - `file <path> <format>`: Write to `<path>` as `<format>`.
   - `file <path>`: Write to `<path>`, detecting format by extension.
+  - `noop`: No Operation. Doesn't write anything; for testing purposes only.
 - `-f`, `--filter <args...>`: Filter specification. Can be used multiple times.
   - `delete <key>`: Remove a parameter from the configuration. Use dots `.` for nested levels.
   - `move <source> <destination>`: Move a parameter from `<source>` to `<destination>`. Use `.` for the root level.
