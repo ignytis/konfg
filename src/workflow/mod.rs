@@ -5,6 +5,7 @@ pub mod stage;
 use std::collections::{LinkedList, VecDeque};
 
 use anyhow::{Result, anyhow};
+use serde_json::Value;
 
 use crate::{
     jinja::JinjaEngine,
@@ -42,9 +43,7 @@ impl Workflow {
                 TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
                 TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
                 TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => Stage::try_from_strings_filter,
-                TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => {
-                    Stage::try_from_strings_merge_strategy
-                }
+                TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => Stage::try_from_strings_merge_strategy,
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
             };
             stages.push_back(stage_creator_fn(buf, &jinja)?);
@@ -81,7 +80,7 @@ impl Workflow {
     }
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
-    pub fn execute(&self) -> Result<()> {
+    pub fn execute(&self) -> Result<Value> {
         let mut context = StageExecutionContext::new();
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
@@ -98,7 +97,9 @@ impl Workflow {
             };
         }
 
-        Ok(())
+        // Return the final state. Although it had been possibly printed via output,
+        // this value could be used in caller method
+        Ok(context.current_config)
     }
 }
 
