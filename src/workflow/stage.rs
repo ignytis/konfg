@@ -176,4 +176,26 @@ impl Stage {
 
         return Err(anyhow!("Unrecognized filter argument: {:?}", tokens));
     }
+
+    /// Parses a flat list of merge strategy arguments into a `Stage`
+    pub fn try_from_strings_merge_strategy(
+        mut tokens: VecDeque<String>,
+        _jinja: &JinjaEngine,
+    ) -> Result<Stage> {
+        let path = tokens
+            .pop_front()
+            .ok_or_else(|| anyhow!("Missing path for merge strategy"))?;
+        let strategy = tokens
+            .pop_front()
+            .ok_or_else(|| anyhow!("Missing strategy name for merge strategy"))?;
+        let mut args_deque = VecDeque::new();
+        args_deque.push_back(strategy);
+        for arg in tokens {
+            args_deque.push_back(arg);
+        }
+        Ok(Stage::new(StageKind::MergeStrategy {
+            path,
+            strategy: args_deque,
+        }))
+    }
 }

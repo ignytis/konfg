@@ -37,36 +37,17 @@ impl Workflow {
         let mut stages = LinkedList::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
-            let mut buf = parse_arg_buffer(&mut queue);
-            match tok.as_str() {
-                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
-                    stages.push_back(Stage::try_from_strings_input(buf, &jinja)?);
-                }
-                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
-                    stages.push_back(Stage::try_from_strings_output(buf, &jinja)?);
-                }
-                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => {
-                    stages.push_back(Stage::try_from_strings_filter(buf, &jinja)?);
-                }
+            let buf = parse_arg_buffer(&mut queue);
+            let stage_creator_fn = match tok.as_str() {
+                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
+                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
+                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => Stage::try_from_strings_filter,
                 TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => {
-                    let path = buf
-                        .pop_front()
-                        .ok_or_else(|| anyhow!("Missing path for merge strategy"))?;
-                    let strategy = buf
-                        .pop_front()
-                        .ok_or_else(|| anyhow!("Missing strategy name for merge strategy"))?;
-                    let mut args_deque = VecDeque::new();
-                    args_deque.push_back(strategy);
-                    for arg in buf {
-                        args_deque.push_back(arg);
-                    }
-                    stages.push_back(Stage::new(StageKind::MergeStrategy {
-                        path,
-                        strategy: args_deque,
-                    }));
+                    Stage::try_from_strings_merge_strategy
                 }
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
-            }
+            };
+            stages.push_back(stage_creator_fn(buf, &jinja)?);
         }
 
         // Validation: Ensure there is at least one input stage
