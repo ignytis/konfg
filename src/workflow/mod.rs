@@ -153,8 +153,7 @@ mod tests {
             "merge_by_key".to_string(),
             "name".to_string(),
             "-o".to_string(),
-            "stdio".to_string(),
-            "json".to_string(),
+            "noop".to_string(),
         ];
 
         let workflow = Workflow::try_from_args(args)?;
@@ -191,6 +190,8 @@ mod tests {
             "param".to_string(),
             "a.d".to_string(),
             "e".to_string(),
+            "-o".to_string(),
+            "noop".to_string(),
         ];
 
         let workflow = Workflow::try_from_args(args)?;
@@ -229,6 +230,8 @@ mod tests {
             "param".to_string(),
             "a.d".to_string(),
             "e".to_string(),
+            "-o".to_string(),
+            "noop".to_string(),
         ];
 
         let workflow = Workflow::try_from_args(args)?;

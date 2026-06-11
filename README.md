@@ -139,6 +139,8 @@ konfg build [options]
 - `-m`, `--merge-strategy <args...>`: Merge strategy specification. Can be used multiple times.
   - `<path> <strategy> [strategy_args...]`
     Apply a specific merging strategy to the given path in the configuration structure.
+    The strategy takes effect for all subsequent `-i` inputs until changed or reset.
+    Place `-m` **before** the `-i` input it should affect.
     - `<path>`: The path in the merged configuration where the strategy is applied (e.g., `app.features`).
     - `<strategy>`:
       - `simple` (default): Recursive merge for maps, append for arrays.
@@ -386,9 +388,9 @@ app:
 ```bash
 konfg build \
   -i config_a.yaml \
-  -i config_b.yaml \
   -m app.features merge_by_key name \
   -m app.database overwrite \
+  -i config_b.yaml \
   -o stdio json
 ```
 
