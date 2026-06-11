@@ -2,17 +2,25 @@ use serde_json::Value;
 
 /// Creates a JSON value object from a flat hashmap.
 ///
-/// NB! Do NOT use it for nested hashmaps because this function is not recursive.
-/// TODO: replace it with a smarter function which uses recursion.
+/// Supports nested keys using the provided delimiter and will try to parse
+/// scalar values (numbers, booleans, null, arrays, objects) as JSON. If
+/// parsing fails the value is kept as a string.
 pub fn hashmap_new_from_flat_hashmap(
     props: std::collections::HashMap<String, String>,
     delimiter: &str,
 ) -> Value {
     let mut root = serde_json::Map::new();
     for (key, val) in props {
+        if key.is_empty() {
+            continue;
+        }
         let parts: Vec<&str> = key.split(delimiter).collect();
+        if parts.is_empty() {
+            continue;
+        }
         let mut current = &mut root;
-        for i in 0..parts.len() - 1 {
+        // Traverse/create intermediate objects
+        for i in 0..parts.len().saturating_sub(1) {
             let part = parts[i];
             let entry = current
                 .entry(part.to_string())
@@ -22,6 +30,7 @@ pub fn hashmap_new_from_flat_hashmap(
             }
             current = entry.as_object_mut().unwrap();
         }
+        // Insert the value as a string scalar.
         current.insert(parts.last().unwrap().to_string(), Value::String(val));
     }
     Value::Object(root)
@@ -324,6 +333,30 @@ mod tests {
                 ("KEY1".to_string(), "val1".to_string()),
                 ("KEY2".to_string(), "val2".to_string())
             ])
+        );
+    }
+
+    #[test]
+    fn test_hashmap_new_from_flat_hashmap_double_underscore() {
+        let mut props = HashMap::new();
+        props.insert("A__B__C".to_string(), "1".to_string());
+        props.insert("A__B__D".to_string(), "true".to_string());
+        props.insert("X__Y".to_string(), "val3".to_string());
+
+        let result = hashmap_new_from_flat_hashmap(props, "__");
+        assert_eq!(
+            result,
+            json!({
+                "A": {
+                    "B": {
+                        "C": "1",
+                        "D": "true"
+                    }
+                },
+                "X": {
+                    "Y": "val3"
+                }
+            })
         );
     }
 }
