@@ -5,13 +5,15 @@ use crate::workflow::Workflow;
 
 /// Raw arguments for the build command.
 ///
-/// Positional arguments are used to describe inputs and output. Use `--in` to start an input spec
-/// and `--out` to start the output spec. All arguments after `--in` until the next `--in` or `--out`
-/// are considered part of that input. Example:
-///   --in file /path yaml --in stdio json --out yaml
+/// Arguments are used to describe inputs, outputs, filters, and merge strategies.
+/// Use `--input` / `-i` to start an input spec, `--output` / `-o` to start the output spec,
+/// `--filter` / `-f` to apply a filter, and `--merge-strategy` / `-m` to add a merge strategy.
+///
+/// Example:
+///   --input file /path yaml -m my_attribute.my_subattribute merge_by_key name --output stdio json
 #[derive(Args)]
 pub struct BuildArgs {
-    /// Positional arguments describing inputs and output.
+    /// Positional arguments describing inputs, outputs, filters, and merge strategies.
     #[arg(value_name = "TOKENS", num_args = 1.., trailing_var_arg = true, allow_hyphen_values = true)]
     pub args: Vec<String>,
 }

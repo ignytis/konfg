@@ -135,12 +135,23 @@ konfg build [options]
 - `-f`, `--filter <args...>`: Filter specification. Can be used multiple times.
   - `delete <key>`: Remove a parameter from the configuration. Use dots `.` for nested levels.
   - `move <source> <destination>`: Move a parameter from `<source>` to `<destination>`. Use `.` for the root level.
+- `-m`, `--merge-strategy <args...>`: Merge strategy specification. Can be used multiple times.
+  - `<path> <strategy> [strategy_args...]`
+    Apply a specific merging strategy to the given path in the configuration structure.
+    - `<path>`: The path in the merged configuration where the strategy is applied (e.g., `app.features`).
+    - `<strategy>`:
+      - `simple` (default): Recursive merge for maps, append for arrays.
+      - `overwrite`: Overwrite target value completely instead of recursively merging.
+      - `merge_by_key <key_name>`: Merge array elements by matching their `<key_name>` property.
 
 ## Merging Logic
 
-1. **Deep Merge**: Nested maps are merged recursively.
+1. **Deep Merge**: Nested maps are merged recursively (the `simple` strategy).
 2. **Overwriting**: If a key exists in multiple files, the value from the *later* file overwrites the earlier one.
-3. **Template Context**:
+3. **Merge Strategies**: You can configure custom merge behaviors at specific paths using the `-m` / `--merge-strategy` option:
+   - **`overwrite`**: Replaces the target collection with the source collection entirely.
+   - **`merge_by_key <key>`**: Merges elements of arrays of objects by checking if their `<key>` value is equal, and recursively merging them.
+4. **Template Context**:
    - Results of processing the previous inputs are available in context of next inputs
    - Scalar values (strings, numbers, booleans) from previously merged files are automatically added to the Jinja context for subsequent templates.
 
@@ -346,25 +357,63 @@ konfg build \
 }
 ```
 
+#### 6. Use Merge Strategies
+You can control how fields are merged using custom merge strategies.
+
+**`config_a.yaml`**
+```yaml
+app:
+  features:
+    - name: "feature1"
+      enabled: false
+  database:
+    host: "localhost"
+    port: 5432
+```
+
+**`config_b.yaml`**
+```yaml
+app:
+  features:
+    - name: "feature1"
+      enabled: true
+  database:
+    port: 5433
+```
+
+**Command**
+```bash
+konfg build \
+  -i config_a.yaml \
+  -i config_b.yaml \
+  -m app.features merge_by_key name \
+  -m app.database overwrite \
+  -o stdio json
+```
+
+**Output**
+```json
+{
+  "app": {
+    "features": [
+      {
+        "name": "feature1",
+        "enabled": true
+      }
+    ],
+    "database": {
+      "port": 5433
+    }
+  }
+}
+```
+
 ---
 
 ## Supported inputs and outputs:
 
 - Files (see `Supported formats` below)
 - Stdin/Stdout
-- Environment variables (input only)
-
-## Supported Formats
-
-- **YAML** (`.yaml`, `.yml`)
-- **JSON** (`.json`)
-- **TOML** (`.toml`)
-- **Properties** (`.properties`)
-- **Dotenv** (`.env`)
-
-## License
-GPL-3.0
-tdout
 - Environment variables (input only)
 
 ## Supported Formats

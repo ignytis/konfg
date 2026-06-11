@@ -16,16 +16,8 @@ impl JinjaEngine {
         Self { env }
     }
 
-    pub fn render(
-        &self,
-        template: &str,
-        path: &str,
-        ctx: &serde_json::Value,
-    ) -> Result<String> {
-        match self
-            .env
-            .render_named_str(path, template, ctx)
-        {
+    pub fn render(&self, template: &str, path: &str, ctx: &serde_json::Value) -> Result<String> {
+        match self.env.render_named_str(path, template, ctx) {
             Ok(s) => Ok(s),
             Err(e) => anyhow::bail!(
                 "An error occurred while rendering the template:\n{}",

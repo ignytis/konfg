@@ -1,15 +1,17 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use anyhow::{Ok, Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    utils::hashmap::{
-        hashmap_delete_nested_value, hashmap_extract_nested_value, hashmap_insert_nested_value,
-        hashmap_parse_key_parts,
+    utils::{
+        cfg_values::cfg_values_deep_merge,
+        hashmap::{
+            hashmap_delete_nested_value, hashmap_extract_nested_value, hashmap_insert_nested_value,
+            hashmap_parse_key_parts,
+        },
     },
-    workflow::filters::Filter,
-    workflow::stage::StageExecutionContext,
+    workflow::{filters::Filter, stage::StageExecutionContext},
 };
 
 pub const KIND: &str = "stash";
@@ -110,7 +112,6 @@ impl StashFilter {
         }))
     }
 
-
     fn _push(&self, context: &mut StageExecutionContext) -> Result<()> {
         let key = &self.key;
         if context.stash.contains_key(key) {
@@ -148,7 +149,7 @@ impl StashFilter {
                 };
                 context.stash.insert(key.clone(), value);
             }
-            return Ok(())
+            return Ok(());
         }
 
         let s = self.source.as_ref().unwrap().as_str();
@@ -160,8 +161,7 @@ impl StashFilter {
             .clone();
 
         let (new_map, extracted) = hashmap_extract_nested_value(current_obj, &parts);
-        let value = extracted
-            .ok_or_else(|| anyhow!("stash filter: source '{}' not found", s))?;
+        let value = extracted.ok_or_else(|| anyhow!("stash filter: source '{}' not found", s))?;
 
         context.stash.insert(key.clone(), value);
 
@@ -205,17 +205,16 @@ impl StashFilter {
 
         let dest = self.destination.as_ref().unwrap().as_str();
         let parts = hashmap_parse_key_parts(dest);
-        let mut map =
-            match std::mem::replace(&mut context.current_config, Value::Null) {
-                Value::Object(m) => m,
-                _ => serde_json::Map::new(),
-            };
+        let mut map = match std::mem::replace(&mut context.current_config, Value::Null) {
+            Value::Object(m) => m,
+            _ => serde_json::Map::new(),
+        };
 
         let (_, existing) = hashmap_extract_nested_value(map.clone(), &parts);
-        let mut target_val =
-            existing.unwrap_or(Value::Object(serde_json::Map::new()));
+        let mut target_val = existing.unwrap_or(Value::Object(serde_json::Map::new()));
 
-        crate::utils::cfg_values::cfg_values_deep_merge(&mut target_val, &value)?;
+        // TODO: why deep merge here? Do we really want to merge the extracted value?
+        cfg_values_deep_merge(&mut target_val, &value, &HashMap::new())?;
         map = hashmap_insert_nested_value(map, &parts, target_val);
         context.current_config = Value::Object(map);
         Ok(())

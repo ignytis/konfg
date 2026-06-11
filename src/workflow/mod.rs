@@ -2,14 +2,14 @@ pub mod filters;
 pub mod io;
 pub mod stage;
 
-use std::collections::{LinkedList, VecDeque};
+use std::collections::{HashMap, LinkedList, VecDeque};
 
 use anyhow::{Result, anyhow};
 
 use crate::{
     jinja::JinjaEngine,
     utils::cfg_values::cfg_values_deep_merge,
-    workflow::stage::{Stage, StageExecutionContext, StageKind, StageParserFn},
+    workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
 
 /// Constants for command-line arguments.
@@ -19,12 +19,16 @@ const TOKEN_OUTPUT_SHORT: &str = "-o";
 const TOKEN_OUTPUT_LONG: &str = "--output";
 const TOKEN_FILTER_SHORT: &str = "-f";
 const TOKEN_FILTER_LONG: &str = "--filter";
+const TOKEN_MERGE_STRATEGY_SHORT: &str = "-m";
+const TOKEN_MERGE_STRATEGY_LONG: &str = "--merge-strategy";
 
 /// Represents a configuration building workflow.
 pub struct Workflow {
     /// List of stages to be executed sequentially.
     /// The last stage is always the output stage.
     pub stages: LinkedList<Stage>,
+    /// Merge strategies to apply when merging inputs.
+    pub merge_strategies: HashMap<String, VecDeque<String>>,
 }
 
 impl Workflow {
@@ -33,16 +37,36 @@ impl Workflow {
         let jinja = JinjaEngine::new();
 
         let mut stages = LinkedList::new();
+        let mut merge_strategies = HashMap::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
-            let buf = parse_arg_buffer(&mut queue);
-            let fn_parse_args: StageParserFn = match tok.as_str() {
-                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
-                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
-                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => Stage::try_from_strings_filter,
+            let mut buf = parse_arg_buffer(&mut queue);
+            match tok.as_str() {
+                TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => {
+                    stages.push_back(Stage::try_from_strings_input(buf, &jinja)?);
+                }
+                TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => {
+                    stages.push_back(Stage::try_from_strings_output(buf, &jinja)?);
+                }
+                TOKEN_FILTER_SHORT | TOKEN_FILTER_LONG => {
+                    stages.push_back(Stage::try_from_strings_filter(buf, &jinja)?);
+                }
+                TOKEN_MERGE_STRATEGY_SHORT | TOKEN_MERGE_STRATEGY_LONG => {
+                    let path = buf
+                        .pop_front()
+                        .ok_or_else(|| anyhow!("Missing path for merge strategy"))?;
+                    let strategy = buf
+                        .pop_front()
+                        .ok_or_else(|| anyhow!("Missing strategy name for merge strategy"))?;
+                    let mut args_deque = VecDeque::new();
+                    args_deque.push_back(strategy);
+                    for arg in buf {
+                        args_deque.push_back(arg);
+                    }
+                    merge_strategies.insert(path, args_deque);
+                }
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
-            };
-            stages.push_back(fn_parse_args(buf, &jinja)?);
+            }
         }
 
         // Validation: The first stage must be an input stage
@@ -58,19 +82,27 @@ impl Workflow {
             stages.push_back(Stage::new_output_default());
         }
 
-        Ok(Workflow { stages })
+        Ok(Workflow {
+            stages,
+            merge_strategies,
+        })
     }
 
     /// Executes the workflow: runs all input stages, merges their results, and runs the output stage.
     pub fn execute(&self) -> Result<()> {
         let mut context = StageExecutionContext::new();
+        context.merge_strategies = self.merge_strategies.clone();
         let mut iter = self.stages.iter().peekable();
         while let Some(stage) = iter.next() {
             let value = stage.run(&mut context)?;
             // Update the context for results of input stage only.
             // Output stage returns Null and cannot be merged into compiled config
             match stage.kind {
-                StageKind::Input(_) => cfg_values_deep_merge(&mut context.current_config, &value)?,
+                StageKind::Input(_) => cfg_values_deep_merge(
+                    &mut context.current_config,
+                    &value,
+                    &context.merge_strategies,
+                )?,
                 _ => {}
             };
         }
@@ -91,6 +123,8 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
             || next == TOKEN_OUTPUT_LONG
             || next == TOKEN_FILTER_SHORT
             || next == TOKEN_FILTER_LONG
+            || next == TOKEN_MERGE_STRATEGY_SHORT
+            || next == TOKEN_MERGE_STRATEGY_LONG
         {
             break;
         }
@@ -98,4 +132,82 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
     }
 
     buf
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        utils::cfg_values::cfg_values_deep_merge,
+        workflow::{Workflow, stage::StageExecutionContext},
+    };
+
+    use anyhow::Result;
+    use serde_json::json;
+
+    #[test]
+    fn test_workflow_parse_merge_strategy() -> Result<()> {
+        let args = vec![
+            "-i".to_string(),
+            "param".to_string(),
+            "my_attribute.my_subattribute".to_string(),
+            "val1".to_string(),
+            "-m".to_string(),
+            "my_attribute.my_subattribute".to_string(),
+            "merge_by_key".to_string(),
+            "name".to_string(),
+            "-o".to_string(),
+            "stdio".to_string(),
+            "json".to_string(),
+        ];
+
+        let workflow = Workflow::try_from_args(args)?;
+        assert_eq!(workflow.stages.len(), 2);
+
+        let strategy = workflow
+            .merge_strategies
+            .get("my_attribute.my_subattribute")
+            .unwrap();
+        assert_eq!(strategy.get(0).unwrap(), "merge_by_key");
+        assert_eq!(strategy.get(1).unwrap(), "name");
+        assert_eq!(strategy.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_workflow_execute_with_merge_strategy() -> Result<()> {
+        let args = vec![
+            "-i".to_string(),
+            "param".to_string(),
+            "a.b".to_string(),
+            "c".to_string(),
+            "-i".to_string(),
+            "param".to_string(),
+            "a.d".to_string(),
+            "e".to_string(),
+            "-m".to_string(),
+            "a".to_string(),
+            "overwrite".to_string(),
+        ];
+
+        let workflow = Workflow::try_from_args(args)?;
+        let mut context = StageExecutionContext::new();
+        context.merge_strategies = workflow.merge_strategies.clone();
+
+        for stage in &workflow.stages {
+            if stage.is_input() {
+                let value = stage.run(&mut context)?;
+                cfg_values_deep_merge(
+                    &mut context.current_config,
+                    &value,
+                    &context.merge_strategies,
+                )?;
+            }
+        }
+
+        // With overwrite strategy on "a", the second input (a.d = e) should completely overwrite the first (a.b = c).
+        assert_eq!(context.current_config, json!({ "a": { "d": "e" } }));
+
+        Ok(())
+    }
 }

@@ -23,6 +23,7 @@ pub enum StageKind {
 pub struct StageExecutionContext {
     pub current_config: Value,
     pub stash: HashMap<String, Value>,
+    pub merge_strategies: HashMap<String, VecDeque<String>>,
 }
 
 impl StageExecutionContext {
@@ -30,6 +31,7 @@ impl StageExecutionContext {
         Self {
             current_config: Value::Object(Default::default()),
             stash: HashMap::new(),
+            merge_strategies: HashMap::new(),
         }
     }
 }
@@ -38,9 +40,6 @@ impl StageExecutionContext {
 pub struct Stage {
     pub kind: StageKind,
 }
-
-/// A definition of stage parser function
-pub type StageParserFn = fn(VecDeque<String>, &JinjaEngine) -> Result<Stage>;
 
 impl Stage {
     pub fn new(kind: StageKind) -> Self {

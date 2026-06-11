@@ -8,7 +8,7 @@
 
 - **Multi-format Support:** Merge YAML, JSON, TOML, Properties (`.properties`), and Dotenv (`.env`) files.
 - **Jinja2 Templating:** Power your configurations with `minijinja`. Access CLI parameters and previously merged configuration values within templates.
-- **Deep Merging:** Intelligently merges nested objects. Arrays are replaced wholesale (later values win).
+- **Deep Merging:** Intelligently merges nested objects. Supports configurable merging strategies (simple, overwrite, merge_by_key). Default strategy is 'simple' where maps are merged recursively and arrays are appended.
 - **Flexible Input/Output:** Supports multiple input sources and output destinations via `stdio` and `file` handlers.
 - **Filters:** Modify the merged configuration using filters (e.g., `delete` to remove specific parameters).
 - **Format Auto-detection:** Automatically detects formats based on file extensions or explicitly provided tokens.
@@ -76,6 +76,7 @@ At the end of plan execution:
 
 ```bash
 cargo run -- build -i template1.yaml -i template2.toml -i param my.param value -o stdio json
+cargo run -- build -i config1.yaml -i config2.yaml -m app.features merge_by_key name -m app.database overwrite -o stdio yaml
 ```
 
 ## Development Conventions

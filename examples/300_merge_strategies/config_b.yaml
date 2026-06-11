@@ -1,0 +1,9 @@
+app:
+  features:
+    - name: "feature2"
+      enabled: true
+      details: "more info"
+    - name: "feature3"
+      enabled: true
+  database:
+    port: 5433
