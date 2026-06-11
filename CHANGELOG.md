@@ -1,4 +1,4 @@
-## 0.1.4 - 2026-06-09
+## 0.1.5 - 2026-06-12
 
-- Simplified the arguments: no implicit input handler ID and path
-- Detailed error messages
+- Integration tests added
+- Merge strategies introduced
