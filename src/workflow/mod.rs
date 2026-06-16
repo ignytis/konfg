@@ -106,7 +106,7 @@ impl Workflow {
 /// into buffer for current stage until end of stage data is reached.
 /// Returns a StageArgs with parsed arguments for current stage.
 fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> StageArgs {
-    let mut buf: VecDeque<String> = VecDeque::new();
+    let mut args: VecDeque<String> = VecDeque::new();
     while let Some(next) = buf_all.front() {
         if next == TOKEN_INPUT_SHORT
             || next == TOKEN_INPUT_LONG
@@ -119,10 +119,10 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> StageArgs {
         {
             break;
         }
-        buf.push_back(buf_all.pop_front().unwrap());
+        args.push_back(buf_all.pop_front().unwrap());
     }
 
-    StageArgs::new_from_args(buf)
+    StageArgs::new_from_args(args)
 }
 
 #[cfg(test)]

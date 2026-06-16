@@ -59,7 +59,7 @@ impl StageArgs {
     /// Creates a new `StageArgs` by parsing a list of string tokens.
     /// Key-value arguments like `some_key=some_value` are split and inserted into `kwargs`,
     /// while other arguments are pushed into `args`.
-    pub fn new_from_args(tokens: VecDeque<String>) -> Self {
+    pub fn new_from_args<A: IntoIterator<Item = String>>(tokens: A) -> Self {
         let mut args = Vec::new();
         let mut kwargs = HashMap::new();
         for token in tokens {

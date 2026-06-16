@@ -340,25 +340,25 @@ mod tests {
 
     #[test]
     fn test_new_from_args_push_with_flags() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "push".to_string(),
             "--source=a.b".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
-        ]));
+        ]);
 
-        let _filter_box = StashFilter::new_from_args(tokens).unwrap();
+        let _filter_box = StashFilter::new_from_args(args).unwrap();
     }
 
     #[test]
     fn test_new_from_args_push_destination_not_last_fails() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "push".to_string(),
             "mykey".to_string(),
             "--preserve".to_string(),
-        ]));
+        ]);
 
-        let result = StashFilter::new_from_args(tokens);
+        let result = StashFilter::new_from_args(args);
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("unknown argument 'mykey'"));
@@ -455,14 +455,14 @@ mod tests {
 
     #[test]
     fn test_new_from_args_pop_with_preserve() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "pop".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
             "dest.path".to_string(),
-        ]));
+        ]);
 
-        let _ = StashFilter::new_from_args(tokens).unwrap();
+        let _ = StashFilter::new_from_args(args).unwrap();
     }
 
     #[test]

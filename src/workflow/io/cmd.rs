@@ -129,12 +129,12 @@ mod tests {
 
     #[test]
     fn test_cmd_try_parse_args() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "cmd".to_string(),
             "json".to_string(),
             "ls".to_string(),
-        ]));
-        let stage = CmdHandler::new_from_args(tokens, false).unwrap();
+        ]);
+        let stage = CmdHandler::new_from_args(args, false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok
         } else {

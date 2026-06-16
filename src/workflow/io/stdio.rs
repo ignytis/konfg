@@ -75,21 +75,15 @@ mod tests {
 
     #[test]
     fn test_stdio_try_parse_args_input() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
-            "stdio".to_string(),
-            "json".to_string(),
-        ]));
-        let stage = StdioHandler::new_from_args(tokens, false).unwrap();
+        let args = StageArgs::new_from_args(vec!["stdio".to_string(), "json".to_string()]);
+        let stage = StdioHandler::new_from_args(args, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_stdio_try_parse_args_output() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
-            "stdio".to_string(),
-            "yaml".to_string(),
-        ]));
-        let stage = StdioHandler::new_from_args(tokens, true).unwrap();
+        let args = StageArgs::new_from_args(vec!["stdio".to_string(), "yaml".to_string()]);
+        let stage = StdioHandler::new_from_args(args, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

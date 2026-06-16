@@ -60,31 +60,29 @@ impl FilePreprocessor for FileHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-
     use crate::workflow::stage::StageKind;
 
     use super::*;
 
     #[test]
     fn test_file_try_parse_args_input() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             KIND.to_string(),
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
-        ]));
-        let stage = FileHandler::new_from_args(tokens, false).unwrap();
+        ]);
+        let stage = FileHandler::new_from_args(args, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_file_try_parse_args_output() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             KIND.to_string(),
             "output.json".to_string(),
             "json".to_string(),
-        ]));
-        let stage = FileHandler::new_from_args(tokens, true).unwrap();
+        ]);
+        let stage = FileHandler::new_from_args(args, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

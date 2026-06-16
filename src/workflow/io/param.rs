@@ -174,12 +174,12 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args_output_error() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "param".to_string(),
             "key".to_string(),
             "value".to_string(),
-        ]));
-        let result = ParamHandler::new_from_args(tokens, true);
+        ]);
+        let result = ParamHandler::new_from_args(args, true);
         assert!(result.is_err());
         if let Err(e) = result {
             assert_eq!(e.to_string(), "param: writing to params is not supported");
@@ -193,12 +193,12 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
+        let args = StageArgs::new_from_args(vec![
             "param".to_string(),
             "foo".to_string(),
             "bar".to_string(),
-        ]));
-        let stage = ParamHandler::new_from_args(tokens, false).unwrap();
+        ]);
+        let stage = ParamHandler::new_from_args(args, false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok
         } else {
@@ -208,8 +208,7 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args_missing_value() {
-        let tokens =
-            StageArgs::new_from_args(VecDeque::from(vec!["param".to_string(), "foo".to_string()]));
+        let tokens = StageArgs::new_from_args(vec!["param".to_string(), "foo".to_string()]);
         let result = ParamHandler::new_from_args(tokens, false);
         if let Err(e) = result {
             assert_eq!(e.to_string(), "param: missing value");

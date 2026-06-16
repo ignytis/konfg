@@ -105,8 +105,8 @@ mod tests {
 
     #[test]
     fn test_env_try_parse_args_output_error() {
-        let tokens = StageArgs::new_from_args(VecDeque::from(vec!["env".to_string()]));
-        let result = EnvHandler::new_from_args(tokens, true);
+        let args = StageArgs::new_from_args(vec!["env".to_string()]);
+        let result = EnvHandler::new_from_args(args, true);
         assert!(result.is_err());
         if let Err(e) = result {
             assert_eq!(
