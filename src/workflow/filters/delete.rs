@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
@@ -19,15 +17,12 @@ pub struct DeleteFilter {
 
 impl DeleteFilter {
     pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
-        let mut args = VecDeque::from(tokens.args);
-        let key = match args.pop_front() {
-            Some(k) => k,
+        let key = match tokens.args.first() {
+            Some(k) => k.clone(),
             None => return Err(anyhow!("delete filter: missing key")),
         };
 
-        Ok(Box::new(DeleteFilter {
-            key: String::from(key),
-        }))
+        Ok(Box::new(DeleteFilter { key }))
     }
 }
 

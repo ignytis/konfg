@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::{Result, anyhow};
 
 use crate::{
@@ -19,29 +17,28 @@ pub struct TplFileHandler {
 
 impl TplFileHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        let is_first_token_kind_keyword = match args.front().map(String::as_str) {
-            Some(k) if k == KIND => true,
+        let first = tokens.args.first().map(String::as_str);
+        let (path_idx, is_first_token_kind_keyword) = match first {
+            Some(k) if k == KIND => (1, true),
             Some(maybe_path) => {
                 if !std::path::Path::new(maybe_path).exists() {
                     return Err(anyhow!("tplfile handler: not supported"));
                 }
-                false
+                (0, false)
             }
             _ => return Err(anyhow!("tplfile handler: not supported")),
         };
+        let _ = is_first_token_kind_keyword; // consumed implicitly via path_idx
 
-        if is_first_token_kind_keyword {
-            args.pop_front();
-        }
-
-        let path = match args.pop_front() {
-            Some(v) => v,
+        let path = match tokens.args.get(path_idx) {
+            Some(v) => v.clone(),
             None => return Err(anyhow!("tplfile: missing path")),
         };
 
-        let format =
-            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut args)?;
+        let (format, _) = crate::workflow::io::file_common::resolve_format_from_tokens(
+            &path,
+            &tokens.args[path_idx + 1..],
+        )?;
 
         let handler = TplFileHandler { path, format };
 

@@ -180,9 +180,8 @@ impl Stage {
 
     /// Parses a flat list of arguments into a `Stage` using registered filter handlers.
     pub fn try_from_strings_filter(tokens: StageArgs) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        let id = match args.pop_front() {
-            Some(i) => i,
+        let id = match tokens.args.first() {
+            Some(i) => i.clone(),
             None => return Err(anyhow!("Missing filter id")),
         };
 
@@ -192,7 +191,7 @@ impl Stage {
             }
 
             let handler = it_creator_fn(StageArgs {
-                args: Vec::from(args),
+                args: tokens.args[1..].to_vec(),
                 kwargs: tokens.kwargs,
             })?;
             return Ok(Stage {
@@ -205,21 +204,15 @@ impl Stage {
 
     /// Parses a flat list of merge strategy arguments into a `Stage`
     pub fn try_from_strings_merge_strategy(tokens: StageArgs) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        let path = args
-            .pop_front()
-            .ok_or_else(|| anyhow!("Missing path for merge strategy"))?;
-        let strategy = args
-            .pop_front()
-            .ok_or_else(|| anyhow!("Missing strategy name for merge strategy"))?;
-        let mut args_deque = VecDeque::new();
-        args_deque.push_back(strategy);
-        for arg in args {
-            args_deque.push_back(arg);
+        let path = tokens
+            .args
+            .first()
+            .ok_or_else(|| anyhow!("Missing path for merge strategy"))?
+            .clone();
+        let strategy: VecDeque<String> = tokens.args[1..].iter().cloned().collect();
+        if strategy.is_empty() {
+            return Err(anyhow!("Missing strategy name for merge strategy"));
         }
-        Ok(Stage::new(StageKind::MergeStrategy {
-            path,
-            strategy: args_deque,
-        }))
+        Ok(Stage::new(StageKind::MergeStrategy { path, strategy }))
     }
 }

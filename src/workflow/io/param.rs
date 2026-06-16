@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::{Result, anyhow};
 use serde_json::{Map, Value};
 
@@ -20,8 +18,7 @@ pub struct ParamHandler {
 
 impl ParamHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.front().map(String::as_str) != Some(KIND) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             return Err(anyhow!("param handler: not supported"));
         }
 
@@ -29,15 +26,13 @@ impl ParamHandler {
             return Err(anyhow!("param: writing to params is not supported"));
         }
 
-        args.pop_front();
-
-        let key = match args.pop_front() {
-            Some(k) => k,
+        let key = match tokens.args.get(1) {
+            Some(k) => k.clone(),
             None => return Err(anyhow!("param: missing key")),
         };
 
-        let value = match args.pop_front() {
-            Some(v) => v,
+        let value = match tokens.args.get(2) {
+            Some(v) => v.clone(),
             None => return Err(anyhow!("param: missing value")),
         };
 

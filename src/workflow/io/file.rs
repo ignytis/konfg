@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::{Result, anyhow};
 
 use crate::{
@@ -18,21 +16,18 @@ pub struct FileHandler {
 
 impl FileHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.front().map(String::as_str) != Some(KIND) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             // Check if it's a path for guessing (though 'file' usually requires the keyword)
             return Err(anyhow!("file handler: not supported"));
         }
 
-        args.pop_front();
-
-        let path = match args.pop_front() {
-            Some(v) => v,
+        let path = match tokens.args.get(1) {
+            Some(v) => v.clone(),
             None => return Err(anyhow!("file: missing path")),
         };
 
-        let format =
-            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut args)?;
+        let (format, _) =
+            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &tokens.args[2..])?;
 
         let handler = FileHandler { path, format };
 

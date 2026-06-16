@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use anyhow::{Ok, Result, anyhow};
 use serde_json::Value;
@@ -49,8 +49,7 @@ pub struct StashFilter {
 
 impl StashFilter {
     pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
-        let mut args = VecDeque::from(tokens.args);
-        let mode_str = match args.pop_front() {
+        let mode_str = match tokens.args.first() {
             Some(m) => m,
             None => return Err(anyhow!("stash filter: missing mode (push|pop)")),
         };
@@ -64,46 +63,49 @@ impl StashFilter {
         let mut destination = None;
         let mut preserve = false;
 
+        // index 0 is the mode; positional args start at 1
+        let mut idx = 1;
+
         if mode == StashMode::Push {
-            if args.is_empty() {
+            if idx >= tokens.args.len() {
                 return Err(anyhow!("stash filter: missing destination"));
             }
 
             // The last one is the key
-            key = args.pop_back().unwrap();
+            key = tokens.args.last().unwrap().clone();
 
-            // The rest are flags
-            while let Some(token) = args.pop_front() {
+            // The rest (between idx and last) are flags
+            while idx < tokens.args.len() - 1 {
+                let token = &tokens.args[idx];
                 if token == "--preserve" {
                     preserve = true;
                 } else {
                     return Err(anyhow!("stash filter: unknown argument '{}'", token));
                 }
+                idx += 1;
             }
         } else {
-            // mode == Pop
-            while let Some(token) = args.front() {
-                if token == "--preserve" {
-                    preserve = true;
-                    args.pop_front();
-                } else {
-                    break;
-                }
+            // mode == Pop: first consume --preserve flags, then key, then optional destination
+            while idx < tokens.args.len() && tokens.args[idx] == "--preserve" {
+                preserve = true;
+                idx += 1;
             }
 
-            key = match args.pop_front() {
-                Some(k) => k,
+            key = match tokens.args.get(idx) {
+                Some(k) => k.clone(),
                 None => return Err(anyhow!("stash filter: missing key")),
             };
+            idx += 1;
 
-            if let Some(dest) = args.pop_front() {
-                destination = Some(dest);
+            if let Some(dest) = tokens.args.get(idx) {
+                destination = Some(dest.clone());
+                idx += 1;
             }
 
-            if !args.is_empty() {
+            if idx < tokens.args.len() {
                 return Err(anyhow!(
                     "stash filter: unknown argument '{}'",
-                    args.front().unwrap()
+                    tokens.args[idx]
                 ));
             }
         }

@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 
@@ -23,20 +21,19 @@ pub struct MoveFilter {
 
 impl MoveFilter {
     pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
-        let mut args = VecDeque::from(tokens.args);
-        let source = match args.pop_front() {
-            Some(s) => s,
+        let source = match tokens.args.first() {
+            Some(s) => s.clone(),
             None => return Err(anyhow!("move filter: missing source key")),
         };
 
-        let destination = match args.pop_front() {
-            Some(d) => d,
+        let destination = match tokens.args.get(1) {
+            Some(d) => d.clone(),
             None => return Err(anyhow!("move filter: missing destination key")),
         };
 
         Ok(Box::new(MoveFilter {
-            source: String::from(source),
-            destination: String::from(destination),
+            source,
+            destination,
         }))
     }
 }

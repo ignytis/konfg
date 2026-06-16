@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::env;
 
 use anyhow::Result;
@@ -21,8 +21,7 @@ pub struct EnvHandler {
 
 impl EnvHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.front().map(String::as_str) != Some(KIND) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             return Err(anyhow::anyhow!("env handler: not supported"));
         }
 
@@ -32,9 +31,7 @@ impl EnvHandler {
             ));
         }
 
-        args.pop_front();
-
-        let prefix = args.pop_front();
+        let prefix = tokens.args.get(1).cloned();
 
         Ok(Stage::new(StageKind::Input(Box::new(EnvHandler {
             prefix,

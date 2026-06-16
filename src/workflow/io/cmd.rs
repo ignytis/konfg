@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::process::Command;
 
 use anyhow::{Result, anyhow};
@@ -21,8 +20,7 @@ pub struct CmdHandler {
 
 impl CmdHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.front().map(String::as_str) != Some(KIND) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             return Err(anyhow!("cmd handler: not supported"));
         }
 
@@ -32,18 +30,15 @@ impl CmdHandler {
             ));
         }
 
-        args.pop_front();
-
-        let format = match args.pop_front() {
-            Some(v) => v,
+        let format = match tokens.args.get(1) {
+            Some(v) => v.clone(),
             None => return Err(anyhow!("cmd: missing format")),
         };
-        let command = args
+        let command = tokens.args[2..]
             .iter()
             .map(|item| item.as_str())
             .collect::<Vec<&str>>()
             .join(" ");
-        args.clear();
 
         Ok(Stage::new(StageKind::Input(Box::new(CmdHandler {
             command,

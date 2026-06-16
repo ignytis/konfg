@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::io::{Read, Write};
 
 use anyhow::{Result, anyhow};
@@ -21,13 +20,11 @@ pub struct StdioHandler {
 
 impl StdioHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.front().map(String::as_str) != Some(KIND) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             return Err(anyhow!("stdio handler: not supported"));
         }
-        args.pop_front();
-        let format = match args.pop_front() {
-            Some(v) => v,
+        let format = match tokens.args.get(1) {
+            Some(v) => v.clone(),
             None => return Err(anyhow!("stdio: missing format")),
         };
 

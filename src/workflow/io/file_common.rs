@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
@@ -14,18 +13,14 @@ use crate::{
 
 /// Resolve format name either from next token (if it matches a format handler)
 /// or by guessing from file extension.
-/// If a format token is used, it will be consumed from `tokens`.
-pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> Result<String> {
-    let next_token_maybe_format = match tokens.front() {
-        Some(t) => t.clone(),
-        None => String::new(),
-    };
+/// Returns `(format_name, tokens_consumed)` where `tokens_consumed` is 1 if a format
+/// token was used, or 0 if the format was inferred from the file extension.
+pub fn resolve_format_from_tokens(path: &str, tokens: &[String]) -> Result<(String, usize)> {
+    let next_token_maybe_format = tokens.first().map(String::as_str).unwrap_or("");
 
     // Try to get handler by next token
-    if get_handler_for_format(&next_token_maybe_format).is_some() {
-        // consume format token
-        tokens.pop_front();
-        return Ok(next_token_maybe_format);
+    if get_handler_for_format(next_token_maybe_format).is_some() {
+        return Ok((next_token_maybe_format.to_string(), 1));
     }
 
     // Guess by file extension
@@ -35,7 +30,7 @@ pub fn resolve_format_from_tokens(path: &str, tokens: &mut VecDeque<String>) -> 
         .unwrap_or("");
 
     match get_handler_for_file_extension(ext) {
-        Ok((id, _)) => Ok(id.to_string()),
+        Ok((id, _)) => Ok((id.to_string(), 0)),
         Err(_) => Err(anyhow!(
             "Failed to find the format handler using CLI arguments or file extension"
         )),

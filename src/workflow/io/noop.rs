@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use anyhow::Result;
 
 use crate::workflow::{
@@ -28,8 +26,7 @@ impl OutputHandler for NoopHandler {
 
 impl NoopHandler {
     pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
-        let mut args = VecDeque::from(tokens.args);
-        if args.pop_front().map(|t| t != KIND).unwrap_or(true) {
+        if tokens.args.first().map(String::as_str) != Some(KIND) {
             return Err(anyhow::anyhow!("noop handler: not supported"));
         }
         if !is_output {
