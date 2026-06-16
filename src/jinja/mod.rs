@@ -1,7 +1,15 @@
 mod functions;
 
+use std::sync::LazyLock;
+
 use anyhow::Result;
 use minijinja::Environment;
+
+
+static JINJA_ENGINE_SINGLETON: LazyLock<JinjaEngine> = LazyLock::new(|| {
+    JinjaEngine::new()
+});
+
 
 #[derive(Clone)]
 pub struct JinjaEngine {
@@ -24,6 +32,10 @@ impl JinjaEngine {
                 e.display_debug_info().to_string()
             ),
         }
+    }
+
+    pub fn get_singleton() -> &'static JinjaEngine {
+        &JINJA_ENGINE_SINGLETON
     }
 }
 

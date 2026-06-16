@@ -5,7 +5,6 @@ use serde_json::Value;
 
 use crate::{
     file_format_handlers::get_handler_for_format,
-    jinja::JinjaEngine,
     workflow::{
         filters::{Filter, REGISTERED_FILTERS},
         io::{InputHandler, OutputHandler, REGISTERED_HANDLERS, stdio::StdioHandler},
@@ -61,7 +60,6 @@ impl Stage {
         Stage {
             kind: StageKind::Output(Box::new(StdioHandler {
                 format: "json".to_string(),
-                jinja: JinjaEngine::new(),
             })),
         }
     }
@@ -106,7 +104,7 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single input.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_input(tokens: VecDeque<String>, jinja: &JinjaEngine) -> Result<Stage> {
+    pub fn try_from_strings_input(tokens: VecDeque<String>) -> Result<Stage> {
         let id = match tokens.front().map(String::as_str) {
             Some(i) => i,
             None => return Err(anyhow!("Missing input id")),
@@ -117,7 +115,7 @@ impl Stage {
                 continue;
             }
 
-            match it_creator_fn(tokens.clone(), jinja, false) {
+            match it_creator_fn(tokens.clone(), false) {
                 Ok(s) => return Ok(s),
                 Err(_) if !id.eq(*it_id) => continue, // If we were guessing, ignore error and try next
                 Err(e) => return Err(e),
@@ -130,7 +128,7 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single output.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_output(tokens: VecDeque<String>, jinja: &JinjaEngine) -> Result<Stage> {
+    pub fn try_from_strings_output(tokens: VecDeque<String>) -> Result<Stage> {
         let id = match tokens.front().map(String::as_str) {
             Some(i) => i,
             None => return Err(anyhow!("Missing output id")),
@@ -143,7 +141,7 @@ impl Stage {
                 }
             }
 
-            match it_creator_fn(tokens.clone(), jinja, true) {
+            match it_creator_fn(tokens.clone(), true) {
                 Ok(s) => return Ok(s),
                 Err(_) if !id.eq(*it_id) => continue,
                 Err(e) => return Err(e),
@@ -156,7 +154,6 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered filter handlers.
     pub fn try_from_strings_filter(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
     ) -> Result<Stage> {
         let id = match tokens.pop_front() {
             Some(i) => i,
@@ -180,7 +177,6 @@ impl Stage {
     /// Parses a flat list of merge strategy arguments into a `Stage`
     pub fn try_from_strings_merge_strategy(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
     ) -> Result<Stage> {
         let path = tokens
             .pop_front()

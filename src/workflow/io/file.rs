@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use anyhow::{Result, anyhow};
 
 use crate::{
-    jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, file_common::FilePreprocessor},
     workflow::stage::{Stage, StageKind},
 };
@@ -20,7 +19,6 @@ pub struct FileHandler {
 impl FileHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
@@ -66,7 +64,7 @@ impl FilePreprocessor for FileHandler {
 mod tests {
     use std::collections::VecDeque;
 
-    use crate::{jinja::JinjaEngine, workflow::stage::StageKind};
+    use crate::workflow::stage::StageKind;
 
     use super::*;
 
@@ -77,9 +75,7 @@ mod tests {
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = FileHandler::new_from_args(tokens, &jinja, false).unwrap();
+        let stage = FileHandler::new_from_args(tokens, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
@@ -90,9 +86,7 @@ mod tests {
             "output.json".to_string(),
             "json".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = FileHandler::new_from_args(tokens, &jinja, true).unwrap();
+        let stage = FileHandler::new_from_args(tokens, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

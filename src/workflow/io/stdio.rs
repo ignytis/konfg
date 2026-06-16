@@ -17,13 +17,11 @@ pub const KIND: &str = "stdio";
 #[derive(Clone)]
 pub struct StdioHandler {
     pub format: String,
-    pub jinja: JinjaEngine,
 }
 
 impl StdioHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
@@ -37,7 +35,6 @@ impl StdioHandler {
 
         let handler = StdioHandler {
             format,
-            jinja: jinja.clone(),
         };
 
         let kind = if is_output {
@@ -56,8 +53,7 @@ impl InputHandler for StdioHandler {
     fn read(&self, context: &StageExecutionContext) -> Result<Value> {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
-        let rendered = self
-            .jinja
+        let rendered = JinjaEngine::get_singleton()
             .render(&buf, "(stdin)", &context.current_config)?;
 
         get_handler_for_format(&self.format)
@@ -84,18 +80,14 @@ mod tests {
     #[test]
     fn test_stdio_try_parse_args_input() {
         let tokens = VecDeque::from(vec!["stdio".to_string(), "json".to_string()]);
-        let jinja = JinjaEngine::new();
-
-        let stage = StdioHandler::new_from_args(tokens, &jinja, false).unwrap();
+        let stage = StdioHandler::new_from_args(tokens,  false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_stdio_try_parse_args_output() {
         let tokens = VecDeque::from(vec!["stdio".to_string(), "yaml".to_string()]);
-        let jinja = JinjaEngine::new();
-
-        let stage = StdioHandler::new_from_args(tokens, &jinja, true).unwrap();
+        let stage = StdioHandler::new_from_args(tokens, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

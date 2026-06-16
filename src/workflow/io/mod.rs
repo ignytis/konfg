@@ -12,12 +12,9 @@ use std::{collections::VecDeque, sync::LazyLock};
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::{
-    jinja::JinjaEngine,
-    workflow::stage::{Stage, StageExecutionContext},
-};
+use crate::workflow::stage::{Stage, StageExecutionContext};
 
-pub type IoHandlerCreatorFn = fn(VecDeque<String>, &JinjaEngine, bool) -> Result<Stage>;
+pub type IoHandlerCreatorFn = fn(VecDeque<String>, bool) -> Result<Stage>;
 
 pub const REGISTERED_HANDLERS: LazyLock<Vec<(&'static str, IoHandlerCreatorFn)>> =
     LazyLock::new(|| {

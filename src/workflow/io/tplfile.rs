@@ -15,13 +15,11 @@ pub const KIND: &str = "tplfile";
 pub struct TplFileHandler {
     pub path: String,
     pub format: String,
-    pub jinja: JinjaEngine,
 }
 
 impl TplFileHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
@@ -50,7 +48,6 @@ impl TplFileHandler {
         let handler = TplFileHandler {
             path,
             format,
-            jinja: jinja.clone(),
         };
 
         let kind = if is_output {
@@ -65,7 +62,7 @@ impl TplFileHandler {
 
 impl FilePreprocessor for TplFileHandler {
     fn preprocess(&self, raw: &str, path: &str, context: &StageExecutionContext) -> Result<String> {
-        self.jinja.render(raw, path, &context.current_config)
+        JinjaEngine::get_singleton().render(raw, path, &context.current_config)
     }
 
     fn get_path(&self) -> &str {
@@ -83,7 +80,7 @@ impl BaseIoHandler for TplFileHandler {}
 mod tests {
     use std::collections::VecDeque;
 
-    use crate::{jinja::JinjaEngine, workflow::stage::StageKind};
+    use crate::workflow::stage::StageKind;
 
     use super::*;
 
@@ -94,9 +91,7 @@ mod tests {
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = TplFileHandler::new_from_args(tokens, &jinja, false).unwrap();
+        let stage = TplFileHandler::new_from_args(tokens, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
@@ -107,9 +102,7 @@ mod tests {
             "output.json".to_string(),
             "json".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = TplFileHandler::new_from_args(tokens, &jinja, true).unwrap();
+        let stage = TplFileHandler::new_from_args(tokens,  true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

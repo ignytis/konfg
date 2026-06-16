@@ -4,7 +4,6 @@ use anyhow::{Result, anyhow};
 use serde_json::{Map, Value};
 
 use crate::{
-    jinja::JinjaEngine,
     utils::hashmap::{hashmap_insert_nested_value, hashmap_parse_key_parts},
     workflow::io::{BaseIoHandler, InputHandler},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
@@ -22,7 +21,6 @@ pub struct ParamHandler {
 impl ParamHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
@@ -183,8 +181,7 @@ mod tests {
             "key".to_string(),
             "value".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-        let result = ParamHandler::new_from_args(tokens, &jinja, true);
+        let result = ParamHandler::new_from_args(tokens, true);
         assert!(result.is_err());
         if let Err(e) = result {
             assert_eq!(e.to_string(), "param: writing to params is not supported");
@@ -203,9 +200,7 @@ mod tests {
             "foo".to_string(),
             "bar".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = ParamHandler::new_from_args(tokens, &jinja, false).unwrap();
+        let stage = ParamHandler::new_from_args(tokens,  false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok
         } else {
@@ -216,9 +211,7 @@ mod tests {
     #[test]
     fn test_param_try_parse_args_missing_value() {
         let tokens = VecDeque::from(vec!["param".to_string(), "foo".to_string()]);
-        let jinja = JinjaEngine::new();
-
-        let result = ParamHandler::new_from_args(tokens, &jinja, false);
+        let result = ParamHandler::new_from_args(tokens, false);
         if let Err(e) = result {
             assert_eq!(e.to_string(), "param: missing value");
         } else {

@@ -5,7 +5,6 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::{
-    jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
@@ -23,7 +22,6 @@ pub struct EnvHandler {
 impl EnvHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
@@ -110,8 +108,7 @@ mod tests {
     #[test]
     fn test_env_try_parse_args_output_error() {
         let tokens = VecDeque::from(vec!["env".to_string()]);
-        let jinja = JinjaEngine::new();
-        let result = EnvHandler::new_from_args(tokens, &jinja, true);
+        let result = EnvHandler::new_from_args(tokens, true);
         assert!(result.is_err());
         if let Err(e) = result {
             assert_eq!(

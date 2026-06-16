@@ -8,7 +8,6 @@ use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::{
-    jinja::JinjaEngine,
     utils::cfg_values::cfg_values_deep_merge,
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
@@ -33,12 +32,9 @@ pub struct Workflow {
 impl Workflow {
     /// Builds a workflow from a list of command-line arguments.
     pub fn try_from_args(args: Vec<String>) -> Result<Self> {
-        let jinja = JinjaEngine::new();
-
         let mut stages = LinkedList::new();
         let mut queue: VecDeque<String> = args.into_iter().collect();
         while let Some(tok) = queue.pop_front() {
-            let buf = parse_arg_buffer(&mut queue);
             let stage_creator_fn = match tok.as_str() {
                 TOKEN_INPUT_SHORT | TOKEN_INPUT_LONG => Stage::try_from_strings_input,
                 TOKEN_OUTPUT_SHORT | TOKEN_OUTPUT_LONG => Stage::try_from_strings_output,
@@ -48,7 +44,8 @@ impl Workflow {
                 }
                 other => return Err(anyhow!("Unexpected argument: {}", other)),
             };
-            stages.push_back(stage_creator_fn(buf, &jinja)?);
+            let stage_args = parse_arg_buffer(&mut queue);
+            stages.push_back(stage_creator_fn(stage_args)?);
         }
 
         // Validation: Ensure there is at least one input stage

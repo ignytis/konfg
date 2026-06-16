@@ -2,12 +2,9 @@ use std::collections::VecDeque;
 
 use anyhow::Result;
 
-use crate::{
-    jinja::JinjaEngine,
-    workflow::{
-        io::{BaseIoHandler, OutputHandler},
-        stage::{Stage, StageExecutionContext, StageKind},
-    },
+use crate::workflow::{
+    io::{BaseIoHandler, OutputHandler},
+    stage::{Stage, StageExecutionContext, StageKind}
 };
 
 /// Handler identifier for the noop output handler.
@@ -32,7 +29,6 @@ impl OutputHandler for NoopHandler {
 impl NoopHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.pop_front().map(|t| t != KIND).unwrap_or(true) {

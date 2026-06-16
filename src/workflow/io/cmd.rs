@@ -6,7 +6,6 @@ use serde_json::Value;
 
 use crate::{
     file_format_handlers::get_handler_for_format,
-    jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, InputHandler},
     workflow::stage::{Stage, StageExecutionContext, StageKind},
 };
@@ -23,7 +22,6 @@ pub struct CmdHandler {
 impl CmdHandler {
     pub fn new_from_args(
         mut tokens: VecDeque<String>,
-        _jinja: &JinjaEngine,
         is_output: bool,
     ) -> Result<Stage> {
         if tokens.front().map(String::as_str) != Some(KIND) {
@@ -138,9 +136,7 @@ mod tests {
             "json".to_string(),
             "ls".to_string(),
         ]);
-        let jinja = JinjaEngine::new();
-
-        let stage = CmdHandler::new_from_args(tokens, &jinja, false).unwrap();
+        let stage = CmdHandler::new_from_args(tokens, false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok
         } else {
