@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::workflow::{
     io::{BaseIoHandler, OutputHandler},
-    stage::{Stage, StageExecutionContext, StageKind}
+    stage::{Stage, StageArgs, StageExecutionContext, StageKind},
 };
 
 /// Handler identifier for the noop output handler.
@@ -27,11 +27,9 @@ impl OutputHandler for NoopHandler {
 }
 
 impl NoopHandler {
-    pub fn new_from_args(
-        mut tokens: VecDeque<String>,
-        is_output: bool,
-    ) -> Result<Stage> {
-        if tokens.pop_front().map(|t| t != KIND).unwrap_or(true) {
+    pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        if args.pop_front().map(|t| t != KIND).unwrap_or(true) {
             return Err(anyhow::anyhow!("noop handler: not supported"));
         }
         if !is_output {

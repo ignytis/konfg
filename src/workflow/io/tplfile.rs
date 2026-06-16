@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 use crate::{
     jinja::JinjaEngine,
     workflow::io::{BaseIoHandler, file_common::FilePreprocessor},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::stage::{Stage, StageArgs, StageExecutionContext, StageKind},
 };
 
 pub const KIND: &str = "tplfile";
@@ -18,11 +18,9 @@ pub struct TplFileHandler {
 }
 
 impl TplFileHandler {
-    pub fn new_from_args(
-        mut tokens: VecDeque<String>,
-        is_output: bool,
-    ) -> Result<Stage> {
-        let is_first_token_kind_keyword = match tokens.front().map(String::as_str) {
+    pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        let is_first_token_kind_keyword = match args.front().map(String::as_str) {
             Some(k) if k == KIND => true,
             Some(maybe_path) => {
                 if !std::path::Path::new(maybe_path).exists() {
@@ -34,21 +32,18 @@ impl TplFileHandler {
         };
 
         if is_first_token_kind_keyword {
-            tokens.pop_front();
+            args.pop_front();
         }
 
-        let path = match tokens.pop_front() {
+        let path = match args.pop_front() {
             Some(v) => v,
             None => return Err(anyhow!("tplfile: missing path")),
         };
 
         let format =
-            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut tokens)?;
+            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut args)?;
 
-        let handler = TplFileHandler {
-            path,
-            format,
-        };
+        let handler = TplFileHandler { path, format };
 
         let kind = if is_output {
             StageKind::Output(Box::new(handler))
@@ -86,23 +81,23 @@ mod tests {
 
     #[test]
     fn test_tplfile_try_parse_args_input() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "tplfile".to_string(),
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
-        ]);
+        ]));
         let stage = TplFileHandler::new_from_args(tokens, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_tplfile_try_parse_args_output() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "tplfile".to_string(),
             "output.json".to_string(),
             "json".to_string(),
-        ]);
-        let stage = TplFileHandler::new_from_args(tokens,  true).unwrap();
+        ]));
+        let stage = TplFileHandler::new_from_args(tokens, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }
 

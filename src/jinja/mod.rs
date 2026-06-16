@@ -5,11 +5,7 @@ use std::sync::LazyLock;
 use anyhow::Result;
 use minijinja::Environment;
 
-
-static JINJA_ENGINE_SINGLETON: LazyLock<JinjaEngine> = LazyLock::new(|| {
-    JinjaEngine::new()
-});
-
+static JINJA_ENGINE_SINGLETON: LazyLock<JinjaEngine> = LazyLock::new(|| JinjaEngine::new());
 
 #[derive(Clone)]
 pub struct JinjaEngine {

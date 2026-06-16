@@ -11,7 +11,10 @@ use crate::{
             hashmap_parse_key_parts,
         },
     },
-    workflow::{filters::Filter, stage::StageExecutionContext},
+    workflow::{
+        filters::Filter,
+        stage::{StageArgs, StageExecutionContext},
+    },
 };
 
 pub const KIND: &str = "stash";
@@ -23,18 +26,18 @@ pub enum StashMode {
 }
 
 impl TryFrom<&str> for StashMode {
-    fn try_from(v: &str) -> std::prelude::v1::Result<Self, Self::Error> {
-        match v {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
             "push" => Ok(StashMode::Push),
             "pop" => Ok(StashMode::Pop),
-            _ => Err(anyhow!("Unknown stash mode: {}", v)),
+            _ => Err(anyhow!("stash filter: unsupported mode '{}'", value)),
         }
     }
-
-    type Error = anyhow::Error;
 }
 
-/// Filter that pushes/pops the current configuration to/from a named stash.
+/// Filter that pushes/pops a parameter to/from the stash.
 #[derive(Clone)]
 pub struct StashFilter {
     pub mode: StashMode,
@@ -45,7 +48,8 @@ pub struct StashFilter {
 }
 
 impl StashFilter {
-    pub fn new_from_args(mut args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+    pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
+        let mut args = VecDeque::from(tokens.args);
         let mode_str = match args.pop_front() {
             Some(m) => m,
             None => return Err(anyhow!("stash filter: missing mode (push|pop)")),
@@ -53,7 +57,10 @@ impl StashFilter {
 
         let mode: StashMode = mode_str.as_str().try_into()?;
         let key;
-        let mut source = None;
+        let mut source = tokens.kwargs.get("--source").cloned();
+        if source.is_none() {
+            source = tokens.kwargs.get("source").cloned();
+        }
         let mut destination = None;
         let mut preserve = false;
 
@@ -67,9 +74,7 @@ impl StashFilter {
 
             // The rest are flags
             while let Some(token) = args.pop_front() {
-                if token.starts_with("--source=") {
-                    source = Some(token.trim_start_matches("--source=").to_string());
-                } else if token == "--preserve" {
+                if token == "--preserve" {
                     preserve = true;
                 } else {
                     return Err(anyhow!("stash filter: unknown argument '{}'", token));
@@ -100,6 +105,13 @@ impl StashFilter {
                     "stash filter: unknown argument '{}'",
                     args.front().unwrap()
                 ));
+            }
+        }
+
+        // Ensure there are no unknown kwargs
+        for k in tokens.kwargs.keys() {
+            if k != "--source" && k != "source" {
+                return Err(anyhow!("stash filter: unknown argument '{}'", k));
             }
         }
 
@@ -328,23 +340,23 @@ mod tests {
 
     #[test]
     fn test_new_from_args_push_with_flags() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "push".to_string(),
             "--source=a.b".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
-        ]);
+        ]));
 
         let _filter_box = StashFilter::new_from_args(tokens).unwrap();
     }
 
     #[test]
     fn test_new_from_args_push_destination_not_last_fails() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "push".to_string(),
             "mykey".to_string(),
             "--preserve".to_string(),
-        ]);
+        ]));
 
         let result = StashFilter::new_from_args(tokens);
         assert!(result.is_err());
@@ -443,12 +455,12 @@ mod tests {
 
     #[test]
     fn test_new_from_args_pop_with_preserve() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "pop".to_string(),
             "--preserve".to_string(),
             "mykey".to_string(),
             "dest.path".to_string(),
-        ]);
+        ]));
 
         let _ = StashFilter::new_from_args(tokens).unwrap();
     }

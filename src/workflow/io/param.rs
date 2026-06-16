@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use crate::{
     utils::hashmap::{hashmap_insert_nested_value, hashmap_parse_key_parts},
     workflow::io::{BaseIoHandler, InputHandler},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::stage::{Stage, StageArgs, StageExecutionContext, StageKind},
 };
 
 pub const KIND: &str = "param";
@@ -19,11 +19,9 @@ pub struct ParamHandler {
 }
 
 impl ParamHandler {
-    pub fn new_from_args(
-        mut tokens: VecDeque<String>,
-        is_output: bool,
-    ) -> Result<Stage> {
-        if tokens.front().map(String::as_str) != Some(KIND) {
+    pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        if args.front().map(String::as_str) != Some(KIND) {
             return Err(anyhow!("param handler: not supported"));
         }
 
@@ -31,14 +29,14 @@ impl ParamHandler {
             return Err(anyhow!("param: writing to params is not supported"));
         }
 
-        tokens.pop_front();
+        args.pop_front();
 
-        let key = match tokens.pop_front() {
+        let key = match args.pop_front() {
             Some(k) => k,
             None => return Err(anyhow!("param: missing key")),
         };
 
-        let value = match tokens.pop_front() {
+        let value = match args.pop_front() {
             Some(v) => v,
             None => return Err(anyhow!("param: missing value")),
         };
@@ -176,11 +174,11 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args_output_error() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "param".to_string(),
             "key".to_string(),
             "value".to_string(),
-        ]);
+        ]));
         let result = ParamHandler::new_from_args(tokens, true);
         assert!(result.is_err());
         if let Err(e) = result {
@@ -195,12 +193,12 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "param".to_string(),
             "foo".to_string(),
             "bar".to_string(),
-        ]);
-        let stage = ParamHandler::new_from_args(tokens,  false).unwrap();
+        ]));
+        let stage = ParamHandler::new_from_args(tokens, false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok
         } else {
@@ -210,7 +208,8 @@ mod tests {
 
     #[test]
     fn test_param_try_parse_args_missing_value() {
-        let tokens = VecDeque::from(vec!["param".to_string(), "foo".to_string()]);
+        let tokens =
+            StageArgs::new_from_args(VecDeque::from(vec!["param".to_string(), "foo".to_string()]));
         let result = ParamHandler::new_from_args(tokens, false);
         if let Err(e) = result {
             assert_eq!(e.to_string(), "param: missing value");

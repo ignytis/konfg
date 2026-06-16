@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::{
     utils::hashmap::{hashmap_delete_nested_value, hashmap_parse_key_parts},
     workflow::filters::Filter,
-    workflow::stage::StageExecutionContext,
+    workflow::stage::{StageArgs, StageExecutionContext},
 };
 
 pub const KIND: &str = "delete";
@@ -18,7 +18,8 @@ pub struct DeleteFilter {
 }
 
 impl DeleteFilter {
-    pub fn new_from_args(mut args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+    pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
+        let mut args = VecDeque::from(tokens.args);
         let key = match args.pop_front() {
             Some(k) => k,
             None => return Err(anyhow!("delete filter: missing key")),

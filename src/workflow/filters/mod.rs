@@ -3,13 +3,13 @@ pub mod merge_strategies_reset;
 pub mod move_filter;
 pub mod stash;
 
-use std::{collections::VecDeque, sync::LazyLock};
+use std::sync::LazyLock;
 
 use anyhow::Result;
 
-use crate::workflow::stage::StageExecutionContext;
+use crate::workflow::stage::{StageArgs, StageExecutionContext};
 
-pub type FilterCreatorFn = fn(VecDeque<String>) -> Result<Box<dyn Filter>>;
+pub type FilterCreatorFn = fn(StageArgs) -> Result<Box<dyn Filter>>;
 
 pub const REGISTERED_FILTERS: LazyLock<Vec<(&'static str, FilterCreatorFn)>> =
     LazyLock::new(|| {

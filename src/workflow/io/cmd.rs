@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::{
     file_format_handlers::get_handler_for_format,
     workflow::io::{BaseIoHandler, InputHandler},
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::stage::{Stage, StageArgs, StageExecutionContext, StageKind},
 };
 
 pub const KIND: &str = "cmd";
@@ -20,11 +20,9 @@ pub struct CmdHandler {
 }
 
 impl CmdHandler {
-    pub fn new_from_args(
-        mut tokens: VecDeque<String>,
-        is_output: bool,
-    ) -> Result<Stage> {
-        if tokens.front().map(String::as_str) != Some(KIND) {
+    pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        if args.front().map(String::as_str) != Some(KIND) {
             return Err(anyhow!("cmd handler: not supported"));
         }
 
@@ -34,18 +32,18 @@ impl CmdHandler {
             ));
         }
 
-        tokens.pop_front();
+        args.pop_front();
 
-        let format = match tokens.pop_front() {
+        let format = match args.pop_front() {
             Some(v) => v,
             None => return Err(anyhow!("cmd: missing format")),
         };
-        let command = tokens
+        let command = args
             .iter()
             .map(|item| item.as_str())
             .collect::<Vec<&str>>()
             .join(" ");
-        tokens.clear();
+        args.clear();
 
         Ok(Stage::new(StageKind::Input(Box::new(CmdHandler {
             command,
@@ -131,11 +129,11 @@ mod tests {
 
     #[test]
     fn test_cmd_try_parse_args() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             "cmd".to_string(),
             "json".to_string(),
             "ls".to_string(),
-        ]);
+        ]));
         let stage = CmdHandler::new_from_args(tokens, false).unwrap();
         if let StageKind::Input(_) = stage.kind {
             // ok

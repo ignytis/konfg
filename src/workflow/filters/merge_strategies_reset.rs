@@ -1,8 +1,9 @@
-use std::collections::VecDeque;
-
 use anyhow::Result;
 
-use crate::{workflow::filters::Filter, workflow::stage::StageExecutionContext};
+use crate::{
+    workflow::filters::Filter,
+    workflow::stage::{StageArgs, StageExecutionContext},
+};
 
 /// The identifier for the merge strategies reset filter.
 pub const KIND: &str = "merge_strategies_reset";
@@ -13,7 +14,7 @@ pub struct MergeStrategiesResetFilter {}
 
 impl MergeStrategiesResetFilter {
     /// Creates a new instance of the filter from the given arguments.
-    pub fn new_from_args(_args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+    pub fn new_from_args(_args: StageArgs) -> Result<Box<dyn Filter>> {
         Ok(Box::new(MergeStrategiesResetFilter {}))
     }
 }

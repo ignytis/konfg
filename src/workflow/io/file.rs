@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 
 use crate::{
     workflow::io::{BaseIoHandler, file_common::FilePreprocessor},
-    workflow::stage::{Stage, StageKind},
+    workflow::stage::{Stage, StageArgs, StageKind},
 };
 
 pub const KIND: &str = "file";
@@ -17,24 +17,22 @@ pub struct FileHandler {
 }
 
 impl FileHandler {
-    pub fn new_from_args(
-        mut tokens: VecDeque<String>,
-        is_output: bool,
-    ) -> Result<Stage> {
-        if tokens.front().map(String::as_str) != Some(KIND) {
+    pub fn new_from_args(tokens: StageArgs, is_output: bool) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        if args.front().map(String::as_str) != Some(KIND) {
             // Check if it's a path for guessing (though 'file' usually requires the keyword)
             return Err(anyhow!("file handler: not supported"));
         }
 
-        tokens.pop_front();
+        args.pop_front();
 
-        let path = match tokens.pop_front() {
+        let path = match args.pop_front() {
             Some(v) => v,
             None => return Err(anyhow!("file: missing path")),
         };
 
         let format =
-            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut tokens)?;
+            crate::workflow::io::file_common::resolve_format_from_tokens(&path, &mut args)?;
 
         let handler = FileHandler { path, format };
 
@@ -70,22 +68,22 @@ mod tests {
 
     #[test]
     fn test_file_try_parse_args_input() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             KIND.to_string(),
             "non_existent_file.yaml".to_string(),
             "yaml".to_string(),
-        ]);
+        ]));
         let stage = FileHandler::new_from_args(tokens, false).unwrap();
         assert!(matches!(stage.kind, StageKind::Input(_)));
     }
 
     #[test]
     fn test_file_try_parse_args_output() {
-        let tokens = VecDeque::from(vec![
+        let tokens = StageArgs::new_from_args(VecDeque::from(vec![
             KIND.to_string(),
             "output.json".to_string(),
             "json".to_string(),
-        ]);
+        ]));
         let stage = FileHandler::new_from_args(tokens, true).unwrap();
         assert!(matches!(stage.kind, StageKind::Output(_)));
     }

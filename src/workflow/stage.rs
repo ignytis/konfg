@@ -46,6 +46,33 @@ impl StageExecutionContext {
     }
 }
 
+/// Holds positional and key-value arguments for a stage.
+#[derive(Debug, Clone, Default)]
+pub struct StageArgs {
+    /// Positional arguments.
+    pub args: Vec<String>,
+    /// Key-value arguments of `key=value` format.
+    pub kwargs: HashMap<String, String>,
+}
+
+impl StageArgs {
+    /// Creates a new `StageArgs` by parsing a list of string tokens.
+    /// Key-value arguments like `some_key=some_value` are split and inserted into `kwargs`,
+    /// while other arguments are pushed into `args`.
+    pub fn new_from_args(tokens: VecDeque<String>) -> Self {
+        let mut args = Vec::new();
+        let mut kwargs = HashMap::new();
+        for token in tokens {
+            if let Some((key, value)) = token.split_once('=') {
+                kwargs.insert(key.to_string(), value.to_string());
+            } else {
+                args.push(token);
+            }
+        }
+        Self { args, kwargs }
+    }
+}
+
 /// Represents a configuration source or destination with associated IO and format handlers.
 pub struct Stage {
     pub kind: StageKind,
@@ -104,8 +131,8 @@ impl Stage {
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single input.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_input(tokens: VecDeque<String>) -> Result<Stage> {
-        let id = match tokens.front().map(String::as_str) {
+    pub fn try_from_strings_input(tokens: StageArgs) -> Result<Stage> {
+        let id = match tokens.args.first().map(String::as_str) {
             Some(i) => i,
             None => return Err(anyhow!("Missing input id")),
         };
@@ -122,14 +149,14 @@ impl Stage {
             }
         }
 
-        return Err(anyhow!("Unrecognized input argument: {:?}", tokens));
+        return Err(anyhow!("Unrecognized input argument: {:?}", tokens.args));
     }
 
     /// Parses a flat list of arguments into a `Stage` using registered handlers.
     /// `tokens` is a VecDeque of string parameters for single output.
     /// Example: ['file', '/path/to/file.cfg', 'yaml']
-    pub fn try_from_strings_output(tokens: VecDeque<String>) -> Result<Stage> {
-        let id = match tokens.front().map(String::as_str) {
+    pub fn try_from_strings_output(tokens: StageArgs) -> Result<Stage> {
+        let id = match tokens.args.first().map(String::as_str) {
             Some(i) => i,
             None => return Err(anyhow!("Missing output id")),
         };
@@ -148,14 +175,13 @@ impl Stage {
             }
         }
 
-        return Err(anyhow!("Unrecognized output argument: {:?}", tokens));
+        return Err(anyhow!("Unrecognized output argument: {:?}", tokens.args));
     }
 
     /// Parses a flat list of arguments into a `Stage` using registered filter handlers.
-    pub fn try_from_strings_filter(
-        mut tokens: VecDeque<String>,
-    ) -> Result<Stage> {
-        let id = match tokens.pop_front() {
+    pub fn try_from_strings_filter(tokens: StageArgs) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        let id = match args.pop_front() {
             Some(i) => i,
             None => return Err(anyhow!("Missing filter id")),
         };
@@ -165,28 +191,30 @@ impl Stage {
                 continue;
             }
 
-            let handler = it_creator_fn(tokens)?;
+            let handler = it_creator_fn(StageArgs {
+                args: Vec::from(args),
+                kwargs: tokens.kwargs,
+            })?;
             return Ok(Stage {
                 kind: StageKind::Filter(handler),
             });
         }
 
-        return Err(anyhow!("Unrecognized filter argument: {:?}", tokens));
+        return Err(anyhow!("Unrecognized filter argument: {:?}", id));
     }
 
     /// Parses a flat list of merge strategy arguments into a `Stage`
-    pub fn try_from_strings_merge_strategy(
-        mut tokens: VecDeque<String>,
-    ) -> Result<Stage> {
-        let path = tokens
+    pub fn try_from_strings_merge_strategy(tokens: StageArgs) -> Result<Stage> {
+        let mut args = VecDeque::from(tokens.args);
+        let path = args
             .pop_front()
             .ok_or_else(|| anyhow!("Missing path for merge strategy"))?;
-        let strategy = tokens
+        let strategy = args
             .pop_front()
             .ok_or_else(|| anyhow!("Missing strategy name for merge strategy"))?;
         let mut args_deque = VecDeque::new();
         args_deque.push_back(strategy);
-        for arg in tokens {
+        for arg in args {
             args_deque.push_back(arg);
         }
         Ok(Stage::new(StageKind::MergeStrategy {

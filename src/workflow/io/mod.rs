@@ -7,14 +7,14 @@ pub mod param;
 pub mod stdio;
 pub mod tplfile;
 
-use std::{collections::VecDeque, sync::LazyLock};
+use std::sync::LazyLock;
 
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::workflow::stage::{Stage, StageExecutionContext};
+use crate::workflow::stage::{Stage, StageArgs, StageExecutionContext};
 
-pub type IoHandlerCreatorFn = fn(VecDeque<String>, bool) -> Result<Stage>;
+pub type IoHandlerCreatorFn = fn(StageArgs, bool) -> Result<Stage>;
 
 pub const REGISTERED_HANDLERS: LazyLock<Vec<(&'static str, IoHandlerCreatorFn)>> =
     LazyLock::new(|| {

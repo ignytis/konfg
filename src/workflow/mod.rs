@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::{
     utils::cfg_values::cfg_values_deep_merge,
-    workflow::stage::{Stage, StageExecutionContext, StageKind},
+    workflow::stage::{Stage, StageArgs, StageExecutionContext, StageKind},
 };
 
 /// Constants for command-line arguments.
@@ -104,8 +104,8 @@ impl Workflow {
 
 /// Consumes the buffer of all arguments by writing arguments from there
 /// into buffer for current stage until end of stage data is reached.
-/// Returns a buffer with arguments for current stage.
-fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
+/// Returns a StageArgs with parsed arguments for current stage.
+fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> StageArgs {
     let mut buf: VecDeque<String> = VecDeque::new();
     while let Some(next) = buf_all.front() {
         if next == TOKEN_INPUT_SHORT
@@ -122,17 +122,12 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
         buf.push_back(buf_all.pop_front().unwrap());
     }
 
-    buf
+    StageArgs::new_from_args(buf)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        workflow::{
-            Workflow,
-            stage::StageKind,
-        },
-    };
+    use crate::workflow::{Workflow, stage::StageKind};
 
     use anyhow::Result;
     use serde_json::json;
@@ -191,7 +186,7 @@ mod tests {
         ];
 
         let workflow = Workflow::try_from_args(args)?;
-        let result  = match workflow.execute() {
+        let result = match workflow.execute() {
             Ok(r) => r,
             Err(e) => panic!("Workflow execution failed: {}", e),
         };
@@ -223,17 +218,14 @@ mod tests {
         ];
 
         let workflow = Workflow::try_from_args(args)?;
-        let result  = match workflow.execute() {
+        let result = match workflow.execute() {
             Ok(r) => r,
             Err(e) => panic!("Workflow execution failed: {}", e),
         };
 
         // With overwrite strategy reset before the second input,
         // it should merge with default simple strategy (appending/recursive merge).
-        assert_eq!(
-            result,
-            json!({ "a": { "b": "c", "d": "e" } })
-        );
+        assert_eq!(result, json!({ "a": { "b": "c", "d": "e" } }));
 
         Ok(())
     }

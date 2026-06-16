@@ -8,7 +8,7 @@ use crate::{
         hashmap_extract_nested_value, hashmap_insert_nested_value, hashmap_parse_key_parts,
     },
     workflow::filters::Filter,
-    workflow::stage::StageExecutionContext,
+    workflow::stage::{StageArgs, StageExecutionContext},
 };
 
 pub const KIND: &str = "move";
@@ -22,7 +22,8 @@ pub struct MoveFilter {
 }
 
 impl MoveFilter {
-    pub fn new_from_args(mut args: VecDeque<String>) -> Result<Box<dyn Filter>> {
+    pub fn new_from_args(tokens: StageArgs) -> Result<Box<dyn Filter>> {
+        let mut args = VecDeque::from(tokens.args);
         let source = match args.pop_front() {
             Some(s) => s,
             None => return Err(anyhow!("move filter: missing source key")),
