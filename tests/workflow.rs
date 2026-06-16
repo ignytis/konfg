@@ -1,8 +1,8 @@
-#[path = "workflow/basic.rs"]
-mod basic;
+#[path = "workflow/basic_test.rs"]
+mod basic_test;
 
-#[path = "workflow/merge_strategies.rs"]
-mod merge_strategies;
+#[path = "workflow/merge_strategies_test.rs"]
+mod merge_strategies_test;
 
-#[path = "workflow/multipart.rs"]
-mod multipart;
+#[path = "workflow/multipart_test.rs"]
+mod multipart_test;

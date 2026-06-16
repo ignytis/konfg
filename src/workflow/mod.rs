@@ -131,10 +131,9 @@ fn parse_arg_buffer(buf_all: &mut VecDeque<String>) -> VecDeque<String> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        utils::cfg_values::cfg_values_deep_merge,
         workflow::{
             Workflow,
-            stage::{StageExecutionContext, StageKind},
+            stage::StageKind,
         },
     };
 
@@ -195,21 +194,13 @@ mod tests {
         ];
 
         let workflow = Workflow::try_from_args(args)?;
-        let mut context = StageExecutionContext::new();
-
-        for stage in &workflow.stages {
-            let value = stage.run(&mut context)?;
-            if stage.is_input() {
-                cfg_values_deep_merge(
-                    &mut context.current_config,
-                    &value,
-                    &context.merge_strategies,
-                )?;
-            }
-        }
+        let result  = match workflow.execute() {
+            Ok(r) => r,
+            Err(e) => panic!("Workflow execution failed: {}", e),
+        };
 
         // With overwrite strategy on "a", the second input (a.d = e) should completely overwrite the first (a.b = c).
-        assert_eq!(context.current_config, json!({ "a": { "d": "e" } }));
+        assert_eq!(result, json!({ "a": { "d": "e" } }));
 
         Ok(())
     }
@@ -235,23 +226,15 @@ mod tests {
         ];
 
         let workflow = Workflow::try_from_args(args)?;
-        let mut context = StageExecutionContext::new();
-
-        for stage in &workflow.stages {
-            let value = stage.run(&mut context)?;
-            if stage.is_input() {
-                cfg_values_deep_merge(
-                    &mut context.current_config,
-                    &value,
-                    &context.merge_strategies,
-                )?;
-            }
-        }
+        let result  = match workflow.execute() {
+            Ok(r) => r,
+            Err(e) => panic!("Workflow execution failed: {}", e),
+        };
 
         // With overwrite strategy reset before the second input,
         // it should merge with default simple strategy (appending/recursive merge).
         assert_eq!(
-            context.current_config,
+            result,
             json!({ "a": { "b": "c", "d": "e" } })
         );
 
