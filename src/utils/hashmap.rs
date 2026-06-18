@@ -1,3 +1,4 @@
+use anyhow::{Result, bail};
 use serde_json::Value;
 
 /// Creates a JSON value object from a flat hashmap.
@@ -61,17 +62,19 @@ pub fn hashmap_parse_key_parts(key: &str) -> Vec<String> {
 }
 
 /// Inserts a `value` into `map` using `parts` as a path.
+///
+/// Returns an error if `parts` is empty.
 pub fn hashmap_insert_nested_value(
     mut map: serde_json::Map<String, Value>,
     parts: &[String],
     val: Value,
-) -> serde_json::Map<String, Value> {
+) -> Result<serde_json::Map<String, Value>> {
     if parts.is_empty() {
-        return map;
+        bail!("hashmap_insert_nested_value: key path must not be empty");
     }
     if parts.len() == 1 {
         map.insert(parts[0].clone(), val);
-        return map;
+        return Ok(map);
     }
 
     let head = &parts[0];
@@ -83,63 +86,74 @@ pub fn hashmap_insert_nested_value(
     };
     map.insert(
         head.clone(),
-        Value::Object(hashmap_insert_nested_value(inner, tail, val)),
+        Value::Object(hashmap_insert_nested_value(inner, tail, val)?),
     );
-    map
+    Ok(map)
 }
 
 /// Deletes a value from `map` using `parts` as a path.
+///
+/// Returns an error if the key path is not found in the map.
 pub fn hashmap_delete_nested_value(
     mut map: serde_json::Map<String, Value>,
     parts: &[String],
-) -> serde_json::Map<String, Value> {
+) -> Result<serde_json::Map<String, Value>> {
     if parts.is_empty() {
-        return map;
+        bail!("hashmap_delete_nested_value: key path must not be empty");
     }
     if parts.len() == 1 {
-        map.remove(&parts[0]);
-        return map;
+        if map.remove(&parts[0]).is_none() {
+            bail!("hashmap_delete_nested_value: key '{}' not found", parts[0]);
+        }
+        return Ok(map);
     }
 
     let head = &parts[0];
     let tail = &parts[1..];
 
-    if let Some(Value::Object(inner_map)) = map.remove(head) {
-        let updated_inner = hashmap_delete_nested_value(inner_map, tail);
-        // Only re-insert if the inner map is not empty (optional, but cleaner)
-        if !updated_inner.is_empty() {
-            map.insert(head.clone(), Value::Object(updated_inner));
+    match map.remove(head) {
+        Some(Value::Object(inner_map)) => {
+            let updated_inner = hashmap_delete_nested_value(inner_map, tail)?;
+            // Only re-insert if the inner map is not empty (optional, but cleaner)
+            if !updated_inner.is_empty() {
+                map.insert(head.clone(), Value::Object(updated_inner));
+            }
+            Ok(map)
         }
+        _ => bail!("hashmap_delete_nested_value: key '{}' not found", head),
     }
-
-    map
 }
 
 /// Extracts a value from `map` using `parts` as a path.
 /// Returns the updated map and the extracted value.
+///
+/// Returns an error if the key path is not found in the map.
 pub fn hashmap_extract_nested_value(
     mut map: serde_json::Map<String, Value>,
     parts: &[String],
-) -> (serde_json::Map<String, Value>, Option<Value>) {
+) -> Result<(serde_json::Map<String, Value>, Value)> {
     if parts.is_empty() {
-        return (map, None);
+        bail!("hashmap_extract_nested_value: key path must not be empty");
     }
     if parts.len() == 1 {
-        let val = map.remove(&parts[0]);
-        return (map, val);
+        match map.remove(&parts[0]) {
+            Some(val) => return Ok((map, val)),
+            None => bail!("hashmap_extract_nested_value: key '{}' not found", parts[0]),
+        }
     }
 
     let head = &parts[0];
     let tail = &parts[1..];
 
-    if let Some(Value::Object(inner_map)) = map.remove(head) {
-        let (updated_inner, val) = hashmap_extract_nested_value(inner_map, tail);
-        if !updated_inner.is_empty() {
-            map.insert(head.clone(), Value::Object(updated_inner));
+    match map.remove(head) {
+        Some(Value::Object(inner_map)) => {
+            let (updated_inner, val) = hashmap_extract_nested_value(inner_map, tail)?;
+            if !updated_inner.is_empty() {
+                map.insert(head.clone(), Value::Object(updated_inner));
+            }
+            Ok((map, val))
         }
-        (map, val)
-    } else {
-        (map, None)
+        _ => bail!("hashmap_extract_nested_value: key '{}' not found", head),
     }
 }
 
@@ -253,7 +267,8 @@ mod tests {
         map.insert("a".to_string(), json!({"b": {"c": 1, "d": 2}}));
 
         let updated =
-            hashmap_delete_nested_value(map, &["a".to_string(), "b".to_string(), "c".to_string()]);
+            hashmap_delete_nested_value(map, &["a".to_string(), "b".to_string(), "c".to_string()])
+                .unwrap();
         assert_eq!(
             Value::Object(updated.clone()),
             json!({"a": {"b": {"d": 2}}})
@@ -262,8 +277,18 @@ mod tests {
         let updated2 = hashmap_delete_nested_value(
             updated,
             &["a".to_string(), "b".to_string(), "d".to_string()],
-        );
+        )
+        .unwrap();
         assert_eq!(Value::Object(updated2), json!({}));
+    }
+
+    #[test]
+    fn test_hashmap_delete_nested_value_key_not_found() {
+        let mut map = serde_json::Map::new();
+        map.insert("a".to_string(), json!({"b": 1}));
+
+        let result = hashmap_delete_nested_value(map, &["a".to_string(), "x".to_string()]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -272,9 +297,19 @@ mod tests {
         map.insert("a".to_string(), json!({"b": {"c": 1, "d": 2}}));
 
         let (updated, val) =
-            hashmap_extract_nested_value(map, &["a".to_string(), "b".to_string(), "c".to_string()]);
-        assert_eq!(val, Some(json!(1)));
+            hashmap_extract_nested_value(map, &["a".to_string(), "b".to_string(), "c".to_string()])
+                .unwrap();
+        assert_eq!(val, json!(1));
         assert_eq!(Value::Object(updated), json!({"a": {"b": {"d": 2}}}));
+    }
+
+    #[test]
+    fn test_hashmap_extract_nested_value_key_not_found() {
+        let mut map = serde_json::Map::new();
+        map.insert("a".to_string(), json!({"b": 1}));
+
+        let result = hashmap_extract_nested_value(map, &["a".to_string(), "x".to_string()]);
+        assert!(result.is_err());
     }
 
     #[test]

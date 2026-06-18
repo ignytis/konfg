@@ -56,9 +56,17 @@ impl Filter for MoveFilter {
             let parts = hashmap_parse_key_parts(source);
             if let Value::Object(map) = &mut context.current_config {
                 let original_map = std::mem::take(map);
-                let (updated_map, val) = hashmap_extract_nested_value(original_map, &parts);
-                *map = updated_map;
-                val
+                match hashmap_extract_nested_value(original_map.clone(), &parts) {
+                    Ok((updated_map, val)) => {
+                        *map = updated_map;
+                        Some(val)
+                    }
+                    Err(_) => {
+                        // Key not found — restore the original map and move nothing
+                        *map = original_map;
+                        None
+                    }
+                }
             } else {
                 None
             }
@@ -71,7 +79,7 @@ impl Filter for MoveFilter {
                 let dest_parts = hashmap_parse_key_parts(destination);
                 if let Value::Object(map) = &mut context.current_config {
                     let original_map = std::mem::take(map);
-                    let updated_map = hashmap_insert_nested_value(original_map, &dest_parts, val);
+                    let updated_map = hashmap_insert_nested_value(original_map, &dest_parts, val)?;
                     *map = updated_map;
                 } else {
                     // If merged is not an object, we can't insert into it unless destination is "."
@@ -79,7 +87,7 @@ impl Filter for MoveFilter {
                     // Given the context of konfg, merged is usually an object.
                     if context.current_config.is_null() {
                         let map = serde_json::Map::new();
-                        let updated_map = hashmap_insert_nested_value(map, &dest_parts, val);
+                        let updated_map = hashmap_insert_nested_value(map, &dest_parts, val)?;
                         context.current_config = Value::Object(updated_map);
                     } else {
                         return Err(anyhow!(

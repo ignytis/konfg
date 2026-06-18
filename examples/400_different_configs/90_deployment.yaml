@@ -1,0 +1,7 @@
+domain: {{ _misc.regions.europe.region_domain }}.{{ _misc.vars.domain_root }}
+project_full_name: {{ _misc.vars.name }} ({{ _misc.regions.europe.country }})
+env:
+- name: AUTOSTART
+  value: "true"
+- name: NUM_INSTANCES
+  value: 4

@@ -1,0 +1,3 @@
+env:
+- name: NUM_INSTANCES
+  value: 1

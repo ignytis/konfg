@@ -1,0 +1,7 @@
+[europe]
+country = "Stockholm"
+region_domain = "eu"
+
+[north-america]
+country = "United States"
+region_domain = "us"

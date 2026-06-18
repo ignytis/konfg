@@ -47,17 +47,18 @@ impl BaseIoHandler for ParamHandler {}
 
 impl InputHandler for ParamHandler {
     fn read(&self, _context: &StageExecutionContext) -> Result<Value> {
-        Ok(self.parse_nested_param(&self.key, &self.value))
+        Ok(self.parse_nested_param(&self.key, &self.value)?)
     }
 }
 
 impl ParamHandler {
     /// Parses a key-value pair into a nested `Value` structure.
     /// Dots in the key are treated as level separators, unless they are escaped (doubled).
-    fn parse_nested_param(&self, key: &str, value: &str) -> Value {
+    fn parse_nested_param(&self, key: &str, value: &str) -> Result<Value> {
         let parts = hashmap_parse_key_parts(key);
-        let map = hashmap_insert_nested_value(Map::new(), &parts, Value::String(value.to_string()));
-        Value::Object(map)
+        let map =
+            hashmap_insert_nested_value(Map::new(), &parts, Value::String(value.to_string()))?;
+        Ok(Value::Object(map))
     }
 }
 

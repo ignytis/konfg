@@ -138,8 +138,9 @@ impl StashFilter {
         if self.source.is_none() {
             let parts = hashmap_parse_key_parts(key);
             let extracted = if let Value::Object(map) = &context.current_config {
-                let (_, val) = hashmap_extract_nested_value(map.clone(), &parts);
-                val
+                hashmap_extract_nested_value(map.clone(), &parts)
+                    .ok()
+                    .map(|(_, val)| val)
             } else {
                 None
             };
@@ -149,7 +150,7 @@ impl StashFilter {
                 if !preserve {
                     if let Value::Object(map) = &mut context.current_config {
                         let original_map = std::mem::take(map);
-                        *map = hashmap_delete_nested_value(original_map, &parts);
+                        *map = hashmap_delete_nested_value(original_map, &parts)?;
                     }
                 }
             } else {
@@ -174,8 +175,8 @@ impl StashFilter {
             .ok_or_else(|| anyhow!("stash filter: current_config is not an object"))?
             .clone();
 
-        let (new_map, extracted) = hashmap_extract_nested_value(current_obj, &parts);
-        let value = extracted.ok_or_else(|| anyhow!("stash filter: source '{}' not found", s))?;
+        let (new_map, value) = hashmap_extract_nested_value(current_obj, &parts)
+            .map_err(|_| anyhow!("stash filter: source '{}' not found", s))?;
 
         context.stash.insert(key.clone(), value);
 
@@ -224,12 +225,15 @@ impl StashFilter {
             _ => serde_json::Map::new(),
         };
 
-        let (_, existing) = hashmap_extract_nested_value(map.clone(), &parts);
+        let existing = hashmap_extract_nested_value(map.clone(), &parts)
+            .ok()
+            .map(|(_, val)| val);
         let mut target_val = existing.unwrap_or(Value::Object(serde_json::Map::new()));
 
         // TODO: why deep merge here? Do we really want to merge the extracted value?
         cfg_values_deep_merge(&mut target_val, &value, &HashMap::new())?;
-        map = hashmap_insert_nested_value(map, &parts, target_val);
+        map = hashmap_insert_nested_value(map, &parts, target_val)?;
+
         context.current_config = Value::Object(map);
         Ok(())
     }

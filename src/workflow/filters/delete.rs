@@ -33,7 +33,7 @@ impl Filter for DeleteFilter {
         if let Value::Object(map) = &mut context.current_config {
             // We need to take ownership of the map to modify it if we use our utility
             let original_map = std::mem::take(map);
-            let updated_map = hashmap_delete_nested_value(original_map, &parts);
+            let updated_map = hashmap_delete_nested_value(original_map, &parts)?;
             *map = updated_map;
         }
 
